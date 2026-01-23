@@ -37,6 +37,15 @@ class WebSearchTool(Tool):
         if not isinstance(max_results, int) or max_results <= 0:
             raise ValueError("WebSearch: 'max_results' must be a positive integer")
 
+        allowed_domains = tool_input.get("allowed_domains")
+        blocked_domains = tool_input.get("blocked_domains")
+        if allowed_domains is not None and not isinstance(allowed_domains, list):
+            raise ValueError("WebSearch: 'allowed_domains' must be a list of strings")
+        if blocked_domains is not None and not isinstance(blocked_domains, list):
+            raise ValueError("WebSearch: 'blocked_domains' must be a list of strings")
+        allowed_set = {str(d).lower() for d in allowed_domains or []}
+        blocked_set = {str(d).lower() for d in blocked_domains or []}
+
         api_key = os.environ.get("TAVILY_API_KEY")
         if not api_key:
             raise ValueError("WebSearch: missing TAVILY_API_KEY")
@@ -51,13 +60,25 @@ class WebSearchTool(Tool):
             for r in results_in:
                 if not isinstance(r, dict):
                     continue
+                url = r.get("url")
+                host = ""
+                if isinstance(url, str):
+                    try:
+                        import urllib.parse
+
+                        host = (urllib.parse.urlparse(url).hostname or "").lower()
+                    except Exception:  # noqa: BLE001
+                        host = ""
+                if blocked_set and host and any(host == b or host.endswith("." + b) for b in blocked_set):
+                    continue
+                if allowed_set and host and not any(host == a or host.endswith("." + a) for a in allowed_set):
+                    continue
                 results.append(
                     {
                         "title": r.get("title"),
-                        "url": r.get("url"),
+                        "url": url,
                         "content": r.get("content") or r.get("snippet"),
                         "source": "tavily",
                     }
                 )
-        return {"query": query, "results": results}
-
+        return {"query": query, "results": results, "total_results": len(results)}

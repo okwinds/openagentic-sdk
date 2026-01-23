@@ -14,9 +14,10 @@ class EditTool(Tool):
 
     async def run(self, tool_input: Mapping[str, Any], ctx: ToolContext) -> dict[str, Any]:
         file_path = tool_input.get("file_path")
-        old = tool_input.get("old")
-        new = tool_input.get("new")
-        count = tool_input.get("count", 1)
+        old = tool_input.get("old", tool_input.get("old_string"))
+        new = tool_input.get("new", tool_input.get("new_string"))
+        replace_all = tool_input.get("replace_all")
+        count = tool_input.get("count", 1 if not replace_all else 0)
         before = tool_input.get("before")
         after = tool_input.get("after")
 
@@ -56,4 +57,9 @@ class EditTool(Tool):
 
         replaced = text.replace(old, new, count) if count != 0 else text.replace(old, new)
         p.write_text(replaced, encoding="utf-8")
-        return {"file_path": str(p), "replacements": text.count(old) if count == 0 else min(text.count(old), count)}
+        replacements = text.count(old) if count == 0 else min(text.count(old), count)
+        return {
+            "message": "Edit applied",
+            "file_path": str(p),
+            "replacements": replacements,
+        }

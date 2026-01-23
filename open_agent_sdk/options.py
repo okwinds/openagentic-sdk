@@ -31,6 +31,8 @@ class OpenAgentOptions:
     cwd: str = field(default_factory=os.getcwd)
     max_steps: int = 50
     timeout_s: float | None = None
+    include_partial_messages: bool = False
+    abort_event: Any | None = None
 
     tools: ToolRegistry = field(default_factory=default_tool_registry)
     allowed_tools: Sequence[str] | None = None

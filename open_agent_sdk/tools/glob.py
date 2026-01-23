@@ -16,7 +16,14 @@ class GlobTool(Tool):
         pattern = tool_input.get("pattern")
         if not isinstance(pattern, str) or not pattern:
             raise ValueError("Glob: 'pattern' must be a non-empty string")
-        root = tool_input.get("root")
-        base = Path(ctx.cwd) if root is None else Path(root)
+        root = tool_input.get("root", tool_input.get("path"))
+        base = Path(ctx.cwd) if root is None else Path(str(root))
         matches = [str(p) for p in sorted(base.glob(pattern))]
-        return {"root": str(base), "matches": matches}
+        return {
+            "root": str(base),
+            "matches": matches,
+            # CAS-style fields:
+            "search_path": str(base),
+            "pattern": pattern,
+            "count": len(matches),
+        }

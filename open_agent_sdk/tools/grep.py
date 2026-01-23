@@ -22,13 +22,25 @@ class GrepTool(Tool):
         if not isinstance(file_glob, str) or not file_glob:
             raise ValueError("Grep: 'file_glob' must be a non-empty string")
 
-        root_in = tool_input.get("root")
+        root_in = tool_input.get("root", tool_input.get("path"))
         root = Path(ctx.cwd) if root_in is None else Path(str(root_in))
 
         flags = 0 if tool_input.get("case_sensitive", True) else re.IGNORECASE
         rx = re.compile(query, flags=flags)
 
+        mode = tool_input.get("mode", "content")
+        if not isinstance(mode, str) or not mode:
+            raise ValueError("Grep: 'mode' must be a string")
+
+        before_n = tool_input.get("before_context", 0)
+        after_n = tool_input.get("after_context", 0)
+        if not isinstance(before_n, int) or before_n < 0:
+            raise ValueError("Grep: 'before_context' must be a non-negative integer")
+        if not isinstance(after_n, int) or after_n < 0:
+            raise ValueError("Grep: 'after_context' must be a non-negative integer")
+
         matches: list[dict[str, Any]] = []
+        files_with_matches: set[str] = set()
         for p in root.glob(file_glob):
             if not p.is_file():
                 continue
@@ -36,9 +48,28 @@ class GrepTool(Tool):
                 text = p.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 continue
-            for idx, line in enumerate(text.splitlines(), start=1):
+            lines = text.splitlines()
+            for idx, line in enumerate(lines, start=1):
                 if rx.search(line):
-                    matches.append({"file_path": str(p), "line": idx, "text": line})
+                    files_with_matches.add(str(p))
+                    if mode == "files_with_matches":
+                        continue
+                    before_ctx = lines[max(0, idx - 1 - before_n) : idx - 1] if before_n else None
+                    after_ctx = lines[idx : idx + after_n] if after_n else None
+                    matches.append(
+                        {
+                            "file_path": str(p),
+                            "line": idx,
+                            "text": line,
+                            "before_context": before_ctx,
+                            "after_context": after_ctx,
+                        }
+                    )
                     if len(matches) >= self.max_matches:
                         return {"root": str(root), "query": query, "matches": matches, "truncated": True}
-        return {"root": str(root), "query": query, "matches": matches, "truncated": False}
+
+        if mode == "files_with_matches":
+            files = sorted(files_with_matches)
+            return {"root": str(root), "query": query, "files": files, "count": len(files)}
+
+        return {"root": str(root), "query": query, "matches": matches, "truncated": False, "total_matches": len(matches)}

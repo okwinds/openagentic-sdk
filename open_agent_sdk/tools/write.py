@@ -38,4 +38,9 @@ class WriteTool(Tool):
         finally:
             if tmp.exists():
                 tmp.unlink()
-        return {"file_path": str(p), "bytes_written": len(content.encode("utf-8"))}
+        bytes_written = len(content.encode("utf-8"))
+        return {
+            "message": f"Wrote {bytes_written} bytes",
+            "file_path": str(p),
+            "bytes_written": bytes_written,
+        }

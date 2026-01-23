@@ -6,6 +6,7 @@ from typing import Any, Awaitable, Callable, Mapping, Optional
 
 from ..events import UserQuestion
 from .interactive import InteractiveApprover
+from .cas import CanUseTool, PermissionResultAllow, PermissionResultDeny, ToolPermissionContext
 
 Approver = Callable[[str, Mapping[str, Any], Mapping[str, Any]], Awaitable[bool]]
 UserAnswerer = Callable[[UserQuestion], Awaitable[str]]
@@ -15,12 +16,16 @@ UserAnswerer = Callable[[UserQuestion], Awaitable[str]]
 class ApprovalResult:
     allowed: bool
     question: UserQuestion | None = None
+    updated_input: Mapping[str, Any] | None = None
+    deny_message: str | None = None
+    interrupt: bool = False
 
 
 @dataclass(frozen=True, slots=True)
 class PermissionGate:
     permission_mode: str
     approver: Optional[Approver] = None
+    can_use_tool: CanUseTool | None = None
     interactive: bool = False
     interactive_approver: InteractiveApprover | None = None
     user_answerer: UserAnswerer | None = None
@@ -29,6 +34,31 @@ class PermissionGate:
         self, tool_name: str, tool_input: Mapping[str, Any], *, context: Mapping[str, Any]
     ) -> ApprovalResult:
         mode = self.permission_mode
+        if mode == "bypassPermissions":
+            mode = "bypass"
+        if mode == "plan":
+            mode = "deny"
+
+        if self.can_use_tool is not None:
+            res = await self.can_use_tool(tool_name, dict(tool_input), ToolPermissionContext())
+            if isinstance(res, PermissionResultAllow):
+                if res.updated_input is not None:
+                    return ApprovalResult(True, updated_input=res.updated_input)
+                return ApprovalResult(True)
+            if isinstance(res, PermissionResultDeny):
+                return ApprovalResult(False, deny_message=res.message or "denied", interrupt=bool(res.interrupt))
+
+        if mode == "acceptEdits":
+            if tool_name in ("Edit", "Write", "NotebookEdit"):
+                return ApprovalResult(True)
+            mode = "prompt"
+
+        if mode == "default":
+            safe = {"Read", "Glob", "Grep", "SkillList", "SkillLoad", "SlashCommand", "AskUserQuestion"}
+            if tool_name in safe:
+                return ApprovalResult(True)
+            mode = "prompt"
+
         if mode == "bypass":
             return ApprovalResult(True)
         if mode == "deny":

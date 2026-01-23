@@ -2,9 +2,26 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
+from .registry import ToolRegistry
 
-def tool_schemas_for_openai(tool_names: Sequence[str]) -> list[Mapping[str, Any]]:
+
+def tool_schemas_for_openai(tool_names: Sequence[str], *, registry: ToolRegistry | None = None) -> list[Mapping[str, Any]]:
     schemas: dict[str, Mapping[str, Any]] = {
+        "AskUserQuestion": {
+            "type": "function",
+            "function": {
+                "name": "AskUserQuestion",
+                "description": "Ask the user a clarifying question.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "questions": {"type": "array"},
+                        "answers": {"type": "object"},
+                    },
+                    "required": ["questions"],
+                },
+            },
+        },
         "Read": {
             "type": "function",
             "function": {
@@ -98,7 +115,11 @@ def tool_schemas_for_openai(tool_names: Sequence[str]) -> list[Mapping[str, Any]
                 "description": "Fetch a URL over HTTP(S).",
                 "parameters": {
                     "type": "object",
-                    "properties": {"url": {"type": "string"}, "headers": {"type": "object"}},
+                    "properties": {
+                        "url": {"type": "string"},
+                        "headers": {"type": "object"},
+                        "prompt": {"type": "string"},
+                    },
                     "required": ["url"],
                 },
             },
@@ -110,8 +131,31 @@ def tool_schemas_for_openai(tool_names: Sequence[str]) -> list[Mapping[str, Any]
                 "description": "Search the web (Tavily backend).",
                 "parameters": {
                     "type": "object",
-                    "properties": {"query": {"type": "string"}, "max_results": {"type": "integer"}},
+                    "properties": {
+                        "query": {"type": "string"},
+                        "max_results": {"type": "integer"},
+                        "allowed_domains": {"type": "array"},
+                        "blocked_domains": {"type": "array"},
+                    },
                     "required": ["query"],
+                },
+            },
+        },
+        "NotebookEdit": {
+            "type": "function",
+            "function": {
+                "name": "NotebookEdit",
+                "description": "Edit a Jupyter notebook (.ipynb).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "notebook_path": {"type": "string"},
+                        "cell_id": {"type": "string"},
+                        "new_source": {"type": "string"},
+                        "cell_type": {"type": "string"},
+                        "edit_mode": {"type": "string"},
+                    },
+                    "required": ["notebook_path"],
                 },
             },
         },
@@ -181,4 +225,13 @@ def tool_schemas_for_openai(tool_names: Sequence[str]) -> list[Mapping[str, Any]
         schema = schemas.get(name)
         if schema is not None:
             out.append(schema)
+            continue
+        if registry is not None:
+            try:
+                tool = registry.get(name)
+            except KeyError:
+                continue
+            openai_schema = getattr(tool, "openai_schema", None)
+            if isinstance(openai_schema, dict):
+                out.append(openai_schema)
     return out

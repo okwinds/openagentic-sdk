@@ -6,7 +6,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, AsyncIterator, Mapping, Sequence
 
-from .events import AssistantDelta, AssistantMessage, Result, SkillActivated, SystemInit, ToolResult, ToolUse, UserMessage
+from .events import (
+    AssistantDelta,
+    AssistantMessage,
+    Result,
+    SkillActivated,
+    SystemInit,
+    ToolResult,
+    ToolUse,
+    UserMessage,
+    UserQuestion,
+)
 from .hooks.engine import HookEngine
 from .options import OpenAgentOptions
 from .providers.base import ModelOutput, ToolCall
@@ -16,6 +26,7 @@ from .sessions.rebuild import rebuild_messages
 from .sessions.store import FileSessionStore
 from .tools.base import ToolContext
 from .tools.openai import tool_schemas_for_openai
+from .mcp.sdk import McpSdkServerConfig, wrap_sdk_server_tools
 
 
 def _default_session_root() -> Path:
@@ -81,6 +92,15 @@ class AgentRuntime:
     async def query(self, prompt: str) -> AsyncIterator[Any]:
         options = self._options
 
+        if options.mcp_servers:
+            for server_key, cfg in options.mcp_servers.items():
+                if isinstance(cfg, McpSdkServerConfig) and cfg.type == "sdk":
+                    for wrapper in wrap_sdk_server_tools(server_key, cfg):
+                        try:
+                            options.tools.get(wrapper.name)
+                        except KeyError:
+                            options.tools.register(wrapper)
+
         store = options.session_store
         if store is None:
             root = options.session_root or _default_session_root()
@@ -132,18 +152,58 @@ class AgentRuntime:
             messages.insert(0, {"role": "system", "content": _render_system_prompt(sys_prompt, self._active_skills)})
         self._base_system_prompt = sys_prompt
 
+        prompt2, hook_events0, decision0 = await options.hooks.run_user_prompt_submit(
+            prompt=prompt,
+            context={"session_id": session_id, "agent_name": self._agent_name},
+        )
+        for he in hook_events0:
+            store.append_event(session_id, he)
+            yield he
+        if decision0 is not None and decision0.block:
+            for he in await options.hooks.run_session_end(context={"session_id": session_id, "agent_name": self._agent_name}):
+                store.append_event(session_id, he)
+                yield he
+            final = Result(
+                final_text="",
+                session_id=session_id,
+                stop_reason=f"blocked:user_prompt_submit:{decision0.block_reason or 'blocked'}",
+                steps=0,
+                parent_tool_use_id=self._parent_tool_use_id,
+                agent_name=self._agent_name,
+            )
+            store.append_event(session_id, final)
+            yield final
+            return
+
         store.append_event(
             session_id,
             UserMessage(
-                text=prompt,
+                text=prompt2,
                 parent_tool_use_id=self._parent_tool_use_id,
                 agent_name=self._agent_name,
             ),
         )
 
-        messages.append({"role": "user", "content": prompt})
+        messages.append({"role": "user", "content": prompt2})
         steps = 0
         while steps < options.max_steps:
+            if options.abort_event is not None and getattr(options.abort_event, "is_set", lambda: False)():
+                for he in await options.hooks.run_session_end(
+                    context={"session_id": session_id, "agent_name": self._agent_name}
+                ):
+                    store.append_event(session_id, he)
+                    yield he
+                final = Result(
+                    final_text="",
+                    session_id=session_id,
+                    stop_reason="interrupted",
+                    steps=steps,
+                    parent_tool_use_id=self._parent_tool_use_id,
+                    agent_name=self._agent_name,
+                )
+                store.append_event(session_id, final)
+                yield final
+                return
             steps += 1
             tool_names = options.tools.names()
             if options.agents:
@@ -154,7 +214,7 @@ class AgentRuntime:
 
             tool_schemas: Sequence[Mapping[str, Any]] = ()
             if getattr(options.provider, "name", None) in ("openai", "openai-compatible"):
-                tool_schemas = tool_schemas_for_openai(tool_names)
+                tool_schemas = tool_schemas_for_openai(tool_names, registry=options.tools)
 
             if getattr(self, "_base_system_prompt", None) and messages and messages[0].get("role") == "system":
                 messages[0] = {
@@ -196,7 +256,11 @@ class AgentRuntime:
                 parts: list[str] = []
                 tool_calls: list[ToolCall] = []
                 stream_fn = getattr(options.provider, "stream")
+                interrupted = False
                 async for ev in stream_fn(model=options.model, messages=messages, tools=tool_schemas, api_key=options.api_key):
+                    if options.abort_event is not None and getattr(options.abort_event, "is_set", lambda: False)():
+                        interrupted = True
+                        break
                     ev_type = getattr(ev, "type", None)
                     if ev_type is None and isinstance(ev, dict):
                         ev_type = ev.get("type")
@@ -221,6 +285,21 @@ class AgentRuntime:
                             tool_calls.append(tc)
                     elif ev_type == "done":
                         break
+                if interrupted:
+                    for he in await options.hooks.run_session_end(context=model_ctx):
+                        store.append_event(session_id, he)
+                        yield he
+                    final = Result(
+                        final_text="",
+                        session_id=session_id,
+                        stop_reason="interrupted",
+                        steps=steps,
+                        parent_tool_use_id=self._parent_tool_use_id,
+                        agent_name=self._agent_name,
+                    )
+                    store.append_event(session_id, final)
+                    yield final
+                    return
                 assistant_text = "".join(parts) if parts else None
                 model_out = ModelOutput(assistant_text=assistant_text, tool_calls=tool_calls)
             else:
@@ -412,12 +491,85 @@ class AgentRuntime:
                 output=None,
                 is_error=True,
                 error_type="PermissionDenied",
-                error_message="tool use not approved",
+                error_message=approval.deny_message or "tool use not approved",
                 parent_tool_use_id=self._parent_tool_use_id,
                 agent_name=self._agent_name,
             )
             store.append_event(session_id, denied)
             yield denied
+            return
+        tool_input2 = approval.updated_input or tool_input2
+
+        if tool_name == "AskUserQuestion":
+            questions = tool_input2.get("questions")
+            if not isinstance(questions, list) or not questions:
+                result = ToolResult(
+                    tool_use_id=tool_call.tool_use_id,
+                    output=None,
+                    is_error=True,
+                    error_type="InvalidAskUserQuestionInput",
+                    error_message="AskUserQuestion: 'questions' must be a non-empty list",
+                    parent_tool_use_id=self._parent_tool_use_id,
+                    agent_name=self._agent_name,
+                )
+                store.append_event(session_id, result)
+                yield result
+                return
+
+            user_answerer = options.permission_gate.user_answerer
+            if user_answerer is None:
+                result = ToolResult(
+                    tool_use_id=tool_call.tool_use_id,
+                    output=None,
+                    is_error=True,
+                    error_type="NoUserAnswerer",
+                    error_message="AskUserQuestion: no user_answerer is configured",
+                    parent_tool_use_id=self._parent_tool_use_id,
+                    agent_name=self._agent_name,
+                )
+                store.append_event(session_id, result)
+                yield result
+                return
+
+            answers: dict[str, str] = {}
+            for i, q in enumerate(questions):
+                if not isinstance(q, dict):
+                    continue
+                q_text = q.get("question")
+                if not isinstance(q_text, str) or not q_text:
+                    continue
+                opts = q.get("options") or []
+                labels: list[str] = []
+                if isinstance(opts, list):
+                    for opt in opts:
+                        if isinstance(opt, dict):
+                            lab = opt.get("label")
+                            if isinstance(lab, str) and lab:
+                                labels.append(lab)
+                if not labels:
+                    labels = ["ok"]
+
+                uq = UserQuestion(
+                    question_id=f"{tool_call.tool_use_id}:{i}",
+                    prompt=q_text,
+                    choices=labels,
+                    parent_tool_use_id=self._parent_tool_use_id,
+                    agent_name=self._agent_name,
+                )
+                store.append_event(session_id, uq)
+                yield uq
+                ans = await user_answerer(uq)
+                answers[q_text] = str(ans)
+
+            result = ToolResult(
+                tool_use_id=tool_call.tool_use_id,
+                output={"questions": questions, "answers": answers},
+                is_error=False,
+                parent_tool_use_id=self._parent_tool_use_id,
+                agent_name=self._agent_name,
+            )
+            store.append_event(session_id, result)
+            yield result
             return
 
         if tool_name == "SkillActivate":
@@ -546,6 +698,64 @@ class AgentRuntime:
             store.append_event(session_id, result)
             yield result
             return
+
+        if tool_name == "WebFetch":
+            prompt_text = tool_input2.get("prompt")
+            if isinstance(prompt_text, str) and prompt_text:
+                try:
+                    tool = options.tools.get(tool_name)
+                    fetched = await tool.run(tool_input2, ToolContext(cwd=options.cwd))
+                    page_text = fetched.get("text", "") if isinstance(fetched, dict) else ""
+                    if not isinstance(page_text, str):
+                        page_text = str(page_text)
+                    model_out = await options.provider.complete(
+                        model=options.model,
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": f"{prompt_text}\n\nCONTENT:\n{page_text}",
+                            }
+                        ],
+                        tools=(),
+                        api_key=options.api_key,
+                    )
+                    response = model_out.assistant_text or ""
+                    output: dict[str, Any] = {
+                        "response": response,
+                        "url": fetched.get("url") if isinstance(fetched, dict) else tool_input2.get("url"),
+                        "final_url": fetched.get("url") if isinstance(fetched, dict) else None,
+                        "status_code": fetched.get("status") if isinstance(fetched, dict) else None,
+                    }
+                    output2, post_events, post_decision = await hooks.run_post_tool_use(
+                        tool_name=tool_name,
+                        tool_output=output,
+                        context=ctx,
+                    )
+                    for he in post_events:
+                        store.append_event(session_id, he)
+                        yield he
+                    if post_decision is not None and post_decision.block:
+                        raise RuntimeError(post_decision.block_reason or "blocked by hook")
+                    result = ToolResult(
+                        tool_use_id=tool_call.tool_use_id,
+                        output=output2,
+                        is_error=False,
+                        parent_tool_use_id=self._parent_tool_use_id,
+                        agent_name=self._agent_name,
+                    )
+                except Exception as e:  # noqa: BLE001
+                    result = ToolResult(
+                        tool_use_id=tool_call.tool_use_id,
+                        output=None,
+                        is_error=True,
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                        parent_tool_use_id=self._parent_tool_use_id,
+                        agent_name=self._agent_name,
+                    )
+                store.append_event(session_id, result)
+                yield result
+                return
 
         try:
             tool = options.tools.get(tool_name)

@@ -19,7 +19,11 @@ class BashTool(Tool):
         if not isinstance(command, str) or not command:
             raise ValueError("Bash: 'command' must be a non-empty string")
 
-        timeout_s = float(tool_input.get("timeout_s", self.timeout_s))
+        timeout_ms = tool_input.get("timeout")
+        if timeout_ms is not None:
+            timeout_s = float(timeout_ms) / 1000.0
+        else:
+            timeout_s = float(tool_input.get("timeout_s", self.timeout_s))
         proc = subprocess.run(
             ["bash", "-lc", command],
             cwd=ctx.cwd,
@@ -35,6 +39,7 @@ class BashTool(Tool):
             stdout = stdout[: self.max_output_bytes]
         if len(stderr) > self.max_output_bytes:
             stderr = stderr[: self.max_output_bytes]
+        output = (stdout + stderr).decode("utf-8", errors="replace")
         return {
             "command": command,
             "exit_code": int(proc.returncode),
@@ -42,4 +47,9 @@ class BashTool(Tool):
             "stderr": stderr.decode("utf-8", errors="replace"),
             "stdout_truncated": stdout_truncated,
             "stderr_truncated": stderr_truncated,
+            # CAS-compatible aliases:
+            "output": output,
+            "exitCode": int(proc.returncode),
+            "killed": False,
+            "shellId": None,
         }
