@@ -58,6 +58,12 @@ def require_command(name: str, *, help: str) -> str:
     raise SystemExit(f"Missing required command: {name}\n{help}")
 
 
+def example_artifact_dir(example_id: str) -> Path:
+    d = default_session_root() / "example-artifacts" / str(example_id)
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
 def rightcode_provider() -> OpenAICompatibleProvider:
     base_url = os.environ.get("RIGHTCODE_BASE_URL", "https://www.right.codes/codex/v1")
     timeout_s = float(os.environ.get("RIGHTCODE_TIMEOUT_S", "120"))

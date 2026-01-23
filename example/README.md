@@ -15,6 +15,7 @@ Notes:
 - `RIGHTCODE_API_KEY` is required (examples exit early if missing).
 - Session logs are written under `.open-agent-sdk/` (gitignored).
 - Some examples use `TemporaryDirectory()` for the working directory (so files are ephemeral).
+- Examples that write files persist them under `.open-agent-sdk/example-artifacts/<example-id>/` and print the exact output path.
 
 ## Output verbosity
 
