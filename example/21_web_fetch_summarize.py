@@ -16,7 +16,7 @@ async def main() -> None:
         interactive=False,
     )
     prompt = (
-        "Call WebFetch with url='https://example.com' and prompt='Summarize the page in 2 sentences. "
+        "Call WebFetch with url='https://blog.lemonhall.me/notesview/show/667' and prompt='Summarize the page in 2 sentences.用中文回复 "
         "Include token FETCH_OK.'. Then return the tool response."
     )
     printer = EventPrinter(debug=example_debug_enabled())
