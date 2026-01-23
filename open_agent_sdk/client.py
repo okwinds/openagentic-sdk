@@ -36,6 +36,14 @@ class OpenAgentSDKClient:
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:  # noqa: ANN001
+        # Avoid masking the original exception from the `async with` body.
+        # If cleanup fails (e.g., a background runner raised), prefer the original exception.
+        if exc_type is not None:
+            try:
+                await self.disconnect()
+            except Exception:  # noqa: BLE001
+                return
+            return
         await self.disconnect()
 
     async def connect(self, prompt: str | AsyncIterable[dict[str, Any]] | None = None) -> None:

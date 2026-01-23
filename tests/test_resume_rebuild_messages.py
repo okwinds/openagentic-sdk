@@ -67,8 +67,15 @@ class TestResumeRebuild(unittest.IsolatedAsyncioTestCase):
             first = provider2.seen_messages[0]
             roles = [m.get("role") for m in first]
             self.assertIn("tool", roles)
+            # Ensure tool results have a preceding assistant tool_calls message (OpenAI-compatible requirement).
+            tool_idx = next(i for i, m in enumerate(first) if m.get("role") == "tool")
+            self.assertGreater(tool_idx, 0)
+            prev = first[tool_idx - 1]
+            self.assertEqual(prev.get("role"), "assistant")
+            tool_calls = prev.get("tool_calls")
+            self.assertIsInstance(tool_calls, list)
+            self.assertTrue(any(isinstance(tc, dict) and tc.get("id") == "tc1" for tc in tool_calls))
 
 
 if __name__ == "__main__":
     unittest.main()
-

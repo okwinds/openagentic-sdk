@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import urllib.request
+import urllib.error
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Mapping, Optional, Sequence
 
@@ -20,8 +21,16 @@ def _default_transport(url: str, headers: Mapping[str, str], payload: Mapping[st
     req = urllib.request.Request(url, data=data, method="POST")
     for k, v in headers.items():
         req.add_header(k, v)
-    with urllib.request.urlopen(req, timeout=timeout_s) as resp:
-        raw = resp.read()
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+            raw = resp.read()
+    except urllib.error.HTTPError as e:
+        body = ""
+        try:
+            body = e.read().decode("utf-8", errors="replace")
+        except Exception:  # noqa: BLE001
+            body = ""
+        raise RuntimeError(f"HTTP {e.code} from {url}: {body}".strip()) from e
     return json.loads(raw.decode("utf-8"))
 
 
@@ -32,7 +41,15 @@ def _default_stream_transport(
     req = urllib.request.Request(url, data=data, method="POST")
     for k, v in headers.items():
         req.add_header(k, v)
-    resp = urllib.request.urlopen(req, timeout=timeout_s)
+    try:
+        resp = urllib.request.urlopen(req, timeout=timeout_s)
+    except urllib.error.HTTPError as e:
+        body = ""
+        try:
+            body = e.read().decode("utf-8", errors="replace")
+        except Exception:  # noqa: BLE001
+            body = ""
+        raise RuntimeError(f"HTTP {e.code} from {url}: {body}".strip()) from e
     try:
         while True:
             chunk = resp.readline()
