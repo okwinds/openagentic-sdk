@@ -6,9 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from _common import repo_root, rightcode_options
-from open_agent_sdk.console import console_debug_enabled
-
-from open_agent_sdk import run
+from open_agent_sdk.console import console_debug_enabled, console_run
 
 
 async def main() -> None:
@@ -19,13 +17,16 @@ async def main() -> None:
         permission_mode="bypass",
         interactive=False,
     )
-    r1 = await run(prompt="Create 3 TODOs for 'clean up the repo'. Use TodoWrite. Then say RESUME_TODO_1_OK.", options=options1)
+    r1 = await console_run(
+        prompt="Create 3 TODOs for 'clean up the repo'. Use TodoWrite. Then say RESUME_TODO_1_OK.",
+        options=options1,
+    )
     print(r1.final_text)
     session_id = r1.session_id
     print(f"session_id={session_id}")
 
     options2 = replace(options1, resume=session_id)
-    r2 = await run(prompt="Update the TODOs: mark one completed via TodoWrite. Then say RESUME_TODO_2_OK.", options=options2)
+    r2 = await console_run(prompt="Update the TODOs: mark one completed via TodoWrite. Then say RESUME_TODO_2_OK.", options=options2)
     print(r2.final_text)
 
     # Show where the runtime persisted the todos.

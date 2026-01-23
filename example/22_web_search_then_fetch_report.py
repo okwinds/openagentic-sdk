@@ -3,9 +3,7 @@ from __future__ import annotations
 import asyncio
 
 from _common import example_artifact_dir, repo_root, require_env_simple, rightcode_options
-from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled
-
-from open_agent_sdk import query
+from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled, console_query
 
 
 async def main() -> None:
@@ -32,8 +30,7 @@ async def main() -> None:
         "Finally reply with REPORT_OK and mention report.md was written."
     )
     printer = ConsoleRenderer(debug=console_debug_enabled())
-    async for ev in query(prompt=prompt, options=options):
-        printer.on_event(ev)
+    await console_query(prompt=prompt, options=options, renderer=printer)
 
     if report_path.exists():
         print(f"Wrote: {report_path}")

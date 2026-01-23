@@ -5,9 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from _common import rightcode_options
-from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled
-
-from open_agent_sdk import query
+from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled, console_query
 
 
 async def main() -> None:
@@ -21,8 +19,7 @@ async def main() -> None:
         )
         debug = console_debug_enabled()
         printer = ConsoleRenderer(debug=debug)
-        async for ev in query(prompt=prompt, options=options):
-            printer.on_event(ev)
+        await console_query(prompt=prompt, options=options, renderer=printer)
         if (root / "out.txt").exists():
             if debug:
                 print(f"out.txt={ (root / 'out.txt').read_text(encoding='utf-8')!r }")

@@ -4,9 +4,7 @@ import asyncio
 from pathlib import Path
 
 from _common import example_artifact_dir, rightcode_options
-from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled
-
-from open_agent_sdk import query
+from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled, console_query
 
 
 async def main() -> None:
@@ -32,8 +30,7 @@ async def main() -> None:
         "Finally reply with ONBOARDING_NOTES_OK."
     )
     printer = ConsoleRenderer(debug=console_debug_enabled())
-    async for ev in query(prompt=prompt, options=options):
-        printer.on_event(ev)
+    await console_query(prompt=prompt, options=options, renderer=printer)
 
     onboarding = out_dir / "ONBOARDING.md"
     if onboarding.exists():

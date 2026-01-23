@@ -5,9 +5,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from _common import rightcode_options
-from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled
-
-from open_agent_sdk import OpenAgentOptions, query
+from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled, console_query
+from open_agent_sdk import OpenAgentOptions
 from open_agent_sdk.events import UserQuestion
 from open_agent_sdk.permissions.gate import PermissionGate
 
@@ -35,8 +34,7 @@ async def _run_case(*, root: Path, label: str, gate: PermissionGate) -> None:
     )
     prompt = "Use the Read tool to read a.txt. Then reply with NONINTERACTIVE_OK."
     printer = ConsoleRenderer(debug=console_debug_enabled())
-    async for ev in query(prompt=prompt, options=options):
-        printer.on_event(ev)
+    await console_query(prompt=prompt, options=options, renderer=printer)
 
 
 async def main() -> None:

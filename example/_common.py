@@ -67,7 +67,14 @@ def example_artifact_dir(example_id: str) -> Path:
 def rightcode_provider() -> OpenAICompatibleProvider:
     base_url = os.environ.get("RIGHTCODE_BASE_URL", "https://www.right.codes/codex/v1")
     timeout_s = float(os.environ.get("RIGHTCODE_TIMEOUT_S", "120"))
-    return OpenAICompatibleProvider(base_url=base_url, timeout_s=timeout_s)
+    max_retries = int(os.environ.get("RIGHTCODE_MAX_RETRIES", "2"))
+    retry_backoff_s = float(os.environ.get("RIGHTCODE_RETRY_BACKOFF_S", "0.5"))
+    return OpenAICompatibleProvider(
+        base_url=base_url,
+        timeout_s=timeout_s,
+        max_retries=max_retries,
+        retry_backoff_s=retry_backoff_s,
+    )
 
 
 def rightcode_options(

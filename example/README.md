@@ -16,6 +16,7 @@ Notes:
 - Session logs are written under `.open-agent-sdk/` (gitignored).
 - Some examples use `TemporaryDirectory()` for the working directory (so files are ephemeral).
 - Examples that write files persist them under `.open-agent-sdk/example-artifacts/<example-id>/` and print the exact output path.
+- If RIGHTCODE returns transient `HTTP 502/503/504`, examples retry by default (`RIGHTCODE_MAX_RETRIES=2`, `RIGHTCODE_RETRY_BACKOFF_S=0.5`).
 
 ## Output verbosity
 
@@ -50,6 +51,7 @@ Notes:
 - `example/15_hooks_block_tool.py` — hook blocks `Bash` before execution
 - `example/16_slash_command.py` — `SlashCommand` from `.claude/commands`
 - `example/17_skill_list_load_activate.py` — `SkillList`/`SkillLoad`/`SkillActivate` + system prompt update
+- `example/41_skill_main_process.py` — run `.claude/skills/main-process` (delegates to `drawing`)
 
 ## Subagents / MCP / Sessions
 

@@ -6,9 +6,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from _common import rightcode_options
-from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled
+from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled, console_query
 
-from open_agent_sdk import create_sdk_mcp_server, query, tool
+from open_agent_sdk import create_sdk_mcp_server, tool
 
 
 @tool("add", "Add two numbers", {"a": float, "b": float})
@@ -32,8 +32,7 @@ async def main() -> None:
             "After getting the tool result, reply with exactly: MCP_OK:<sum>."
         )
         printer = ConsoleRenderer(debug=console_debug_enabled())
-        async for ev in query(prompt=prompt, options=options):
-            printer.on_event(ev)
+        await console_query(prompt=prompt, options=options, renderer=printer)
 
 
 if __name__ == "__main__":

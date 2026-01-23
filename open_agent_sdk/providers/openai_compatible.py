@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 import urllib.request
 import urllib.error
 from dataclasses import dataclass
@@ -15,41 +16,97 @@ from .stream_events import DoneEvent, TextDeltaEvent, ToolCallEvent
 Transport = Callable[[str, Mapping[str, str], Mapping[str, Any]], Mapping[str, Any]]
 StreamTransport = Callable[[str, Mapping[str, str], Mapping[str, Any]], Iterable[bytes]]
 
+_RETRYABLE_HTTP_STATUS: set[int] = {408, 409, 425, 429, 500, 502, 503, 504}
 
-def _default_transport(url: str, headers: Mapping[str, str], payload: Mapping[str, Any], *, timeout_s: float) -> Mapping[str, Any]:
+
+def _backoff_seconds(attempt_index: int, base: float) -> float:
+    # attempt_index: 0 for first retry, 1 for second retry, ...
+    if attempt_index < 0:
+        return 0.0
+    return max(0.0, base) * (2**attempt_index)
+
+
+def _read_http_error_body(e: urllib.error.HTTPError) -> str:
+    try:
+        return e.read().decode("utf-8", errors="replace")
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _runtime_http_error(url: str, e: urllib.error.HTTPError) -> RuntimeError:
+    body = _read_http_error_body(e)
+    hint = " (transient upstream error; try again)" if int(getattr(e, "code", 0)) in _RETRYABLE_HTTP_STATUS else ""
+    return RuntimeError(f"HTTP {e.code} from {url}{hint}: {body}".strip())
+
+
+def _default_transport(
+    url: str,
+    headers: Mapping[str, str],
+    payload: Mapping[str, Any],
+    *,
+    timeout_s: float,
+    max_retries: int = 0,
+    retry_backoff_s: float = 0.5,
+) -> Mapping[str, Any]:
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(url, data=data, method="POST")
     for k, v in headers.items():
         req.add_header(k, v)
-    try:
-        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
-            raw = resp.read()
-    except urllib.error.HTTPError as e:
-        body = ""
+    last_exc: Exception | None = None
+    max_retries = max(0, int(max_retries))
+    for attempt in range(max_retries + 1):
         try:
-            body = e.read().decode("utf-8", errors="replace")
-        except Exception:  # noqa: BLE001
-            body = ""
-        raise RuntimeError(f"HTTP {e.code} from {url}: {body}".strip()) from e
+            with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+                raw = resp.read()
+            break
+        except urllib.error.HTTPError as e:
+            last_exc = e
+            if attempt < max_retries and int(getattr(e, "code", 0)) in _RETRYABLE_HTTP_STATUS:
+                time.sleep(_backoff_seconds(attempt, retry_backoff_s))
+                continue
+            raise _runtime_http_error(url, e) from e
+        except urllib.error.URLError as e:
+            last_exc = e
+            if attempt < max_retries:
+                time.sleep(_backoff_seconds(attempt, retry_backoff_s))
+                continue
+            raise RuntimeError(f"Request failed to {url}: {e}".strip()) from e
+    else:  # pragma: no cover
+        raise RuntimeError(f"Request failed to {url}: {last_exc}".strip()) from last_exc
     return json.loads(raw.decode("utf-8"))
 
 
 def _default_stream_transport(
-    url: str, headers: Mapping[str, str], payload: Mapping[str, Any], *, timeout_s: float
+    url: str,
+    headers: Mapping[str, str],
+    payload: Mapping[str, Any],
+    *,
+    timeout_s: float,
+    max_retries: int = 0,
+    retry_backoff_s: float = 0.5,
 ) -> Iterable[bytes]:
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(url, data=data, method="POST")
     for k, v in headers.items():
         req.add_header(k, v)
-    try:
-        resp = urllib.request.urlopen(req, timeout=timeout_s)
-    except urllib.error.HTTPError as e:
-        body = ""
+    max_retries = max(0, int(max_retries))
+    resp = None
+    for attempt in range(max_retries + 1):
         try:
-            body = e.read().decode("utf-8", errors="replace")
-        except Exception:  # noqa: BLE001
-            body = ""
-        raise RuntimeError(f"HTTP {e.code} from {url}: {body}".strip()) from e
+            resp = urllib.request.urlopen(req, timeout=timeout_s)
+            break
+        except urllib.error.HTTPError as e:
+            if attempt < max_retries and int(getattr(e, "code", 0)) in _RETRYABLE_HTTP_STATUS:
+                time.sleep(_backoff_seconds(attempt, retry_backoff_s))
+                continue
+            raise _runtime_http_error(url, e) from e
+        except urllib.error.URLError as e:
+            if attempt < max_retries:
+                time.sleep(_backoff_seconds(attempt, retry_backoff_s))
+                continue
+            raise RuntimeError(f"Request failed to {url}: {e}".strip()) from e
+    if resp is None:  # pragma: no cover
+        raise RuntimeError(f"Request failed to {url}".strip())
     try:
         while True:
             chunk = resp.readline()
@@ -83,6 +140,8 @@ class OpenAICompatibleProvider:
     base_url: str = "https://api.openai.com/v1"
     api_key_header: str = "authorization"
     timeout_s: float = 60.0
+    max_retries: int = 0
+    retry_backoff_s: float = 0.5
     transport: Transport | None = None
     stream_transport: StreamTransport | None = None
 
@@ -109,7 +168,14 @@ class OpenAICompatibleProvider:
             payload["tools"] = list(tools)
 
         if self.transport is None:
-            obj = _default_transport(url, headers, payload, timeout_s=self.timeout_s)
+            obj = _default_transport(
+                url,
+                headers,
+                payload,
+                timeout_s=self.timeout_s,
+                max_retries=self.max_retries,
+                retry_backoff_s=self.retry_backoff_s,
+            )
         else:
             obj = self.transport(url, headers, payload)
         choice = (obj.get("choices") or [None])[0] or {}
@@ -173,7 +239,14 @@ class OpenAICompatibleProvider:
 
         assembler = ToolCallAssembler()
         if self.stream_transport is None:
-            chunks = _default_stream_transport(url, headers, payload, timeout_s=self.timeout_s)
+            chunks = _default_stream_transport(
+                url,
+                headers,
+                payload,
+                timeout_s=self.timeout_s,
+                max_retries=self.max_retries,
+                retry_backoff_s=self.retry_backoff_s,
+            )
         else:
             chunks = self.stream_transport(url, headers, payload)
         for data in parse_sse_events(_iter_lines(chunks)):

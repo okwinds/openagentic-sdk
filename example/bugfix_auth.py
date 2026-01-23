@@ -5,9 +5,7 @@ import sys
 sys.dont_write_bytecode = True
 
 from _common import repo_root, rightcode_options
-from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled
-
-from open_agent_sdk import query
+from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled, console_query
 
 
 async def main() -> None:
@@ -15,8 +13,7 @@ async def main() -> None:
     options = rightcode_options(cwd=repo_root(), project_dir=repo_root(), allowed_tools=["Read", "Edit", "Bash"])
 
     printer = ConsoleRenderer(debug=console_debug_enabled())
-    async for event in query(prompt="Find and fix the bug in auth.py", options=options):
-        printer.on_event(event)
+    await console_query(prompt="Find and fix the bug in auth.py", options=options, renderer=printer)
 
 
 if __name__ == "__main__":
