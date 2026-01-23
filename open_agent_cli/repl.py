@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import shutil
 import sys
 from dataclasses import replace
 from typing import TextIO
@@ -86,9 +87,19 @@ async def run_chat(
     while True:
         prompt = "oa> "
         if enable_color:
-            stdout.write(ANSI_RESET)
-            styled_prompt = f"{ANSI_BG_GRAY}\x1b[2K\r{ANSI_FG_GREEN}{prompt}{ANSI_FG_DEFAULT}"
-            stdout.write(styled_prompt)
+            cols = int(shutil.get_terminal_size(fallback=(80, 24)).columns)
+
+            # Add some vertical padding for the input area: one blank gray line above.
+            stdout.write(ANSI_BG_GRAY + (" " * cols) + ANSI_RESET + "\n")
+
+            # Render the prompt on a full-width gray background while keeping the cursor
+            # right after the prompt (so the user types on the gray line).
+            styled_prompt = f"{ANSI_BG_GRAY}{ANSI_FG_GREEN}{prompt}{ANSI_FG_DEFAULT}"
+            fill = " " * max(0, cols - len(prompt))
+            if fill:
+                stdout.write(styled_prompt + fill + "\r" + styled_prompt)
+            else:
+                stdout.write(styled_prompt)
             stdout.flush()
         else:
             stdout.write(prompt)
@@ -102,10 +113,10 @@ async def run_chat(
                 stdout.flush()
             continue
         if enable_color:
-            # The newline after Enter is echoed by the terminal while the input
-            # background is active, so the next line can inherit that background.
-            # Reset and clear the current line so model output has no background.
-            stdout.write(ANSI_RESET + "\x1b[2K")
+            # Add one blank gray line below the user's input ("margin-bottom"), then
+            # reset so subsequent model output has no background.
+            cols = int(shutil.get_terminal_size(fallback=(80, 24)).columns)
+            stdout.write(ANSI_BG_GRAY + (" " * cols) + ANSI_RESET + "\n")
             stdout.flush()
         if line == "":
             if enable_color:
