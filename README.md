@@ -18,6 +18,37 @@ See `README.zh_cn.md` for a Chinese overview.
 - **`.claude` compatibility**: project memory, slash commands, and skills on disk.
 - **OpenAI + OpenAI-compatible providers** (the examples use a real OpenAI-compatible backend by default).
 
+## Quickstart (uv)
+
+Prereqs: Python 3.11+ and `uv`.
+
+Install into a new project:
+
+```bash
+mkdir oas_test && cd oas_test
+uv init
+uv add openagentic-sdk
+export RIGHTCODE_API_KEY="..."  # required
+export RIGHTCODE_BASE_URL="https://www.right.codes/codex/v1"  # optional
+export RIGHTCODE_MODEL="gpt-5.2"  # optional
+export RIGHTCODE_TIMEOUT_S="120"  # optional
+uv run oa chat
+```
+
+Windows (PowerShell):
+
+```powershell
+mkdir oas_test
+cd oas_test
+uv init
+uv add openagentic-sdk
+$env:RIGHTCODE_API_KEY="..."  # required
+$env:RIGHTCODE_BASE_URL="https://www.right.codes/codex/v1"  # optional
+$env:RIGHTCODE_MODEL="gpt-5.2"  # optional
+$env:RIGHTCODE_TIMEOUT_S="120"  # optional
+uv run oa chat
+```
+
 ## Quickstart (local)
 
 Prereqs: Python 3.11+.
@@ -31,6 +62,7 @@ Set env (examples + CLI default to RIGHTCODE):
 - `RIGHTCODE_API_KEY` (required)
 - `RIGHTCODE_BASE_URL` (optional, default `https://www.right.codes/codex/v1`)
 - `RIGHTCODE_MODEL` (optional, default `gpt-5.2`)
+- `RIGHTCODE_TIMEOUT_S` (optional, default `120`)
 
 Run unit tests:
 
@@ -49,6 +81,14 @@ Install (editable):
 
 If `oa` isn't found after installation on Windows, add the scripts directory printed by pip to `PATH` (or run `python -m openagentic_cli chat`).
 
+Install via `uv` (recommended):
+
+```bash
+uv add openagentic-sdk
+uv run oa --help
+uv run oa chat
+```
+
 Optional (recommended): install ripgrep (`rg`) so the agent can search your repo quickly when using shell tools.
 
 - Windows (PowerShell): `winget install BurntSushi.ripgrep.MSVC`
@@ -61,7 +101,7 @@ Commands:
 - `oa resume <session_id>` (alias of `oa chat --resume <session_id>`)
 - `oa logs <session_id>` (summarize `events.jsonl`)
 
-Sessions are stored under `~/.openagentic` by default (override with `OPENAGENTIC_HOME`; legacy env: `OPENAGENTIC_SDK_HOME`).
+Sessions are stored under `~/.openagentic-sdk` by default (override with `OPENAGENTIC_SDK_HOME`).
 
 ## Publishing
 

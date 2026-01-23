@@ -1,4 +1,4 @@
-# 项目简要汇报：openagentic
+# 项目简要汇报：openagentic-sdk
 
 ## 一句话概述
 这是一个纯 Python、开源的 Agent SDK + CLI，参考 Claude Agent SDK 的编程模型，提供可持久化会话、真实 tool loop（含权限审批）、以及对 `.claude/`（skills / commands / project memory）的磁盘兼容能力。
@@ -47,7 +47,7 @@
 - `oa run "prompt"`：一次性执行（支持流式与 JSON 输出选项）
 - `oa resume <session_id>`：恢复会话（等价于 `oa chat --resume <session_id>`）
 - `oa logs <session_id>`：汇总 `events.jsonl`，便于快速回顾对话与工具调用
-- 会话目录：默认 `~/.openagentic`（可用 `OPENAGENTIC_HOME` 覆盖；兼容旧环境变量 `OPENAGENTIC_SDK_HOME`）
+- 会话目录：默认 `~/.openagentic-sdk`（可用 `OPENAGENTIC_SDK_HOME` 覆盖）
 
 ## 现状与成熟度
 - 文档标注为早期阶段（API 可能变化），但核心 runtime + tool loop 已可用。

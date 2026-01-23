@@ -13,9 +13,9 @@ python3 example/01_run_basic.py
 
 Notes:
 - `RIGHTCODE_API_KEY` is required (examples exit early if missing).
-- Session logs are written under `.openagentic/` (gitignored).
+- Session logs are written under `.openagentic-sdk/` (gitignored).
 - Some examples use `TemporaryDirectory()` for the working directory (so files are ephemeral).
-- Examples that write files persist them under `.openagentic/example-artifacts/<example-id>/` and print the exact output path.
+- Examples that write files persist them under `.openagentic-sdk/example-artifacts/<example-id>/` and print the exact output path.
 - If RIGHTCODE returns transient `HTTP 502/503/504`, examples retry by default (`RIGHTCODE_MAX_RETRIES=2`, `RIGHTCODE_RETRY_BACKOFF_S=0.5`).
 
 ## Output verbosity
@@ -64,7 +64,7 @@ Notes:
 
 Web (requires network):
 - `example/21_web_fetch_summarize.py` — `WebFetch` + in-tool summarization prompt
-- `example/22_web_search_then_fetch_report.py` — `WebSearch` → `WebFetch` → `Write` report (`TAVILY_API_KEY` required); writes to `.openagentic/example-artifacts/22/report.md`
+- `example/22_web_search_then_fetch_report.py` — `WebSearch` → `WebFetch` → `Write` report (`TAVILY_API_KEY` required); writes to `.openagentic-sdk/example-artifacts/22/report.md`
 - `example/23_web_search_domain_filters.py` — `WebSearch` domain allowlist (`TAVILY_API_KEY` required)
 - `example/33_web_fetch_json_extract.py` — `WebFetch` JSON endpoint + extraction prompt
 - `example/34_web_fetch_compare_and_write.py` — fetch 2 pages and write comparison

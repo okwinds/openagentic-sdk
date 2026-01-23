@@ -4,7 +4,7 @@ import argparse
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="openagentic")
+    parser = argparse.ArgumentParser(prog="openagentic-sdk")
     parser.add_argument("--version", action="store_true", help="print version and exit")
     args = parser.parse_args(argv)
     if args.version:

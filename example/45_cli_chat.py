@@ -9,7 +9,7 @@ from openagentic_sdk.console import ConsoleRenderer, console_client_turn, consol
 
 
 HELP = """\
-Interactive CLI chat (multi-turn) for openagentic.
+Interactive CLI chat (multi-turn) for openagentic-sdk.
 
 Commands:
   /help         Show this help
@@ -21,13 +21,13 @@ Tips:
   - Try: "What Skills are available?"
   - Try: "执行技能 main-process"
   - Set RIGHTCODE_API_KEY and optionally RIGHTCODE_MODEL/RIGHTCODE_BASE_URL.
-  - Permission mode defaults to acceptEdits; override with OA_PERMISSION_MODE (legacy: OPEN_AGENT_SDK_PERMISSION_MODE).
+  - Permission mode defaults to acceptEdits; override with OPEN_AGENT_SDK_PERMISSION_MODE.
 """
 
 
 async def main() -> None:
     project_dir = repo_root() / "example"
-    permission_mode = os.environ.get("OA_PERMISSION_MODE") or os.environ.get("OPEN_AGENT_SDK_PERMISSION_MODE") or "acceptEdits"
+    permission_mode = os.environ.get("OPEN_AGENT_SDK_PERMISSION_MODE", "acceptEdits")
 
     options = rightcode_options(
         cwd=project_dir,

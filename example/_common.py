@@ -27,13 +27,7 @@ def repo_root() -> Path:
 
 
 def default_session_root() -> Path:
-    new = repo_root() / ".openagentic"
-    legacy = repo_root() / ".openagentic-sdk"
-    if new.exists():
-        return new
-    if legacy.exists():
-        return legacy
-    return new
+    return repo_root() / ".openagentic-sdk"
 
 
 def run_sync(coro: Awaitable[Any]) -> Any:

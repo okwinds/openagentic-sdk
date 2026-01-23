@@ -1,10 +1,10 @@
 [project]
-name = "openagentic"
-version = "0.1.0"
+name = "openagentic-sdk"
+version = "0.1.1"
 description = "Open-source agent SDK (pure Python)"
 readme = "README.md"
 requires-python = ">=3.11"
-authors = [{ name = "openagentic contributors" }]
+authors = [{ name = "openagentic-sdk contributors" }]
 keywords = ["agent", "cli", "tools", "repl"]
 classifiers = [
   "Development Status :: 3 - Alpha",

@@ -4,7 +4,7 @@ This repo uses `setuptools` + `pyproject.toml`.
 
 ## 0) Pick a PyPI project name
 
-PyPI project names must be unique. This repo uses `name = "openagentic"` (see `pyproject.toml`). If it's already taken, change `[project].name` before publishing.
+PyPI project names must be unique. This repo uses `name = "openagentic-sdk"` (see `pyproject.toml`). If it's already taken, change `[project].name` before publishing.
 
 ## 1) Create credentials
 
@@ -34,7 +34,7 @@ python -m twine upload --repository testpypi dist/*
 Install from TestPyPI (note: many dependencies still come from PyPI via `--extra-index-url`):
 
 ```bash
-python -m pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple openagentic
+python -m pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple openagentic-sdk
 ```
 
 ## 5) Upload to PyPI

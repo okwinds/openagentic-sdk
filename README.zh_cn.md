@@ -15,6 +15,24 @@
 - **`.claude` 兼容**：项目记忆、slash commands、skills 都可以从磁盘加载
 - **OpenAI / OpenAI-compatible provider**：示例默认使用一个真实的 OpenAI-compatible 后端（RIGHTCODE）
 
+## 快速开始（uv 安装）
+
+前置：Python 3.11+ 和 `uv`。
+
+在一个新目录里安装并启动 CLI（PowerShell 示例）：
+
+```powershell
+mkdir oas_test
+cd oas_test
+uv init
+uv add openagentic-sdk
+$env:RIGHTCODE_API_KEY="..."  # 必需
+$env:RIGHTCODE_BASE_URL="https://www.right.codes/codex/v1"  # 可选
+$env:RIGHTCODE_MODEL="gpt-5.2"  # 可选
+$env:RIGHTCODE_TIMEOUT_S="120"  # 可选
+uv run oa chat
+```
+
 ## 快速开始（本地）
 
 前置：Python 3.11+。
@@ -28,6 +46,7 @@
 - `RIGHTCODE_API_KEY`（必需）
 - `RIGHTCODE_BASE_URL`（可选，默认 `https://www.right.codes/codex/v1`）
 - `RIGHTCODE_MODEL`（可选，默认 `gpt-5.2`）
+- `RIGHTCODE_TIMEOUT_S`（可选，默认 `120`）
 
 跑测试：
 
@@ -46,6 +65,14 @@
 
 如果在 Windows 下安装后找不到 `oa` 命令，把 pip 输出的 scripts 目录加入 `PATH`（或直接运行 `python -m openagentic_cli chat`）。
 
+使用 `uv` 安装并运行（推荐）：
+
+```powershell
+uv add openagentic-sdk
+uv run oa --help
+uv run oa chat
+```
+
 常用命令：
 
 - `oa chat`（多轮 REPL，输入 `/help` 查看内置 slash commands）
@@ -53,7 +80,7 @@
 - `oa resume <session_id>`（等价于 `oa chat --resume <session_id>`）
 - `oa logs <session_id>`（汇总 `events.jsonl`）
 
-默认会话目录为 `~/.openagentic`（可用 `OPENAGENTIC_HOME` 覆盖；兼容旧环境变量 `OPENAGENTIC_SDK_HOME`）。
+默认会话目录为 `~/.openagentic-sdk`（可用 `OPENAGENTIC_SDK_HOME` 覆盖）。
 
 示例默认需要环境变量（至少要有 `RIGHTCODE_API_KEY`）。在 PowerShell 下可以这样检查：
 

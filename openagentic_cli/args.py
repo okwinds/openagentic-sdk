@@ -24,7 +24,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_logs.add_argument(
         "--session-root",
         default=None,
-        help="Session root directory (default: ~/.openagentic; env: OPENAGENTIC_HOME; legacy env: OPENAGENTIC_SDK_HOME)",
+        help="Session root directory (default: ~/.openagentic-sdk; env: OPENAGENTIC_SDK_HOME)",
     )
 
     return parser
