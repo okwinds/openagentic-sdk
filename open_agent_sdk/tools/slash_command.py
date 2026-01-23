@@ -18,7 +18,7 @@ class SlashCommandTool(Tool):
             raise ValueError("SlashCommand: 'name' must be a non-empty string")
 
         project_dir = tool_input.get("project_dir")
-        base = Path(ctx.cwd) if project_dir is None else Path(str(project_dir))
+        base = Path(ctx.project_dir or ctx.cwd) if project_dir is None else Path(str(project_dir))
         path = base / ".claude" / "commands" / f"{name}.md"
         if not path.exists():
             raise FileNotFoundError(f"SlashCommand: not found: {path}")

@@ -6,13 +6,40 @@ from dataclasses import dataclass, field
 @dataclass(frozen=True, slots=True)
 class SkillDoc:
     name: str = ""
+    description: str = ""
     summary: str = ""
     checklist: list[str] = field(default_factory=list)
     raw: str = ""
 
 
+def _parse_frontmatter(lines: list[str]) -> tuple[dict[str, str], int]:
+    """
+    Very small YAML-ish frontmatter parser:
+    - Only supports top-of-file '---' ... '---'
+    - Only supports 'key: value' single-line pairs
+    Returns (meta, content_start_index).
+    """
+    if not lines or lines[0].strip() != "---":
+        return {}, 0
+    meta: dict[str, str] = {}
+    i = 1
+    while i < len(lines):
+        line = lines[i].rstrip("\n")
+        if line.strip() == "---":
+            return meta, i + 1
+        if ":" in line:
+            k, v = line.split(":", 1)
+            key = k.strip()
+            val = v.strip().strip("'").strip('"')
+            if key and val:
+                meta[key] = val
+        i += 1
+    return meta, 0
+
+
 def parse_skill_markdown(text: str) -> SkillDoc:
     lines = text.splitlines()
+    meta, _ = _parse_frontmatter(lines)
 
     name = ""
     title_idx = None
@@ -21,6 +48,10 @@ def parse_skill_markdown(text: str) -> SkillDoc:
             name = line[2:].strip()
             title_idx = i
             break
+    # Prefer canonical id from frontmatter (e.g. name: main-process).
+    fm_name = meta.get("name") or ""
+    if fm_name:
+        name = fm_name
 
     # summary: first paragraph after title
     summary_lines: list[str] = []
@@ -61,5 +92,10 @@ def parse_skill_markdown(text: str) -> SkillDoc:
                     checklist.append(item)
             j += 1
 
-    return SkillDoc(name=name, summary=summary, checklist=checklist, raw=text)
-
+    return SkillDoc(
+        name=name,
+        description=meta.get("description") or "",
+        summary=summary,
+        checklist=checklist,
+        raw=text,
+    )

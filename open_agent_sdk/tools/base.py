@@ -8,6 +8,7 @@ from typing import Any, Mapping
 @dataclass(frozen=True, slots=True)
 class ToolContext:
     cwd: str
+    project_dir: str | None = None
 
 
 class Tool:

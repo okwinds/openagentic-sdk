@@ -23,7 +23,12 @@ class TestSkillParser(unittest.TestCase):
         self.assertEqual(s.summary, "One line summary.")
         self.assertEqual(s.checklist, ["Do A", "Do B"])
 
+    def test_frontmatter_name_takes_precedence(self) -> None:
+        md = "---\nname: main-process\ndescription: demo\n---\n\n# Main Process\n\nSummary.\n"
+        s = parse_skill_markdown(md)
+        self.assertEqual(s.name, "main-process")
+        self.assertEqual(s.description, "demo")
+
 
 if __name__ == "__main__":
     unittest.main()
-

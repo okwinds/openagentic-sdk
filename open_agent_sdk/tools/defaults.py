@@ -8,6 +8,7 @@ from .ask_user_question import AskUserQuestionTool
 from .read import ReadTool
 from .registry import ToolRegistry
 from .slash_command import SlashCommandTool
+from .skill import SkillTool
 from .skill_activate import SkillActivateTool
 from .skill_list import SkillListTool
 from .skill_load import SkillLoadTool
@@ -32,6 +33,7 @@ def default_tool_registry() -> ToolRegistry:
             WebSearchTool(),
             NotebookEditTool(),
             SlashCommandTool(),
+            SkillTool(),
             SkillListTool(),
             SkillLoadTool(),
             SkillActivateTool(),

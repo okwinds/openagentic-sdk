@@ -9,6 +9,7 @@ from .parse import parse_skill_markdown
 @dataclass(frozen=True, slots=True)
 class SkillInfo:
     name: str
+    description: str
     summary: str
     path: str
 
@@ -23,6 +24,5 @@ def index_skills(*, project_dir: str) -> list[SkillInfo]:
         raw = p.read_text(encoding="utf-8", errors="replace")
         doc = parse_skill_markdown(raw)
         name = doc.name or p.parent.name
-        out.append(SkillInfo(name=name, summary=doc.summary, path=str(p)))
+        out.append(SkillInfo(name=name, description=doc.description, summary=doc.summary, path=str(p)))
     return sorted(out, key=lambda s: s.name)
-

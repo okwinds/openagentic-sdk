@@ -15,7 +15,6 @@ class SkillListTool(Tool):
 
     async def run(self, tool_input: Mapping[str, Any], ctx: ToolContext) -> dict[str, Any]:
         project_dir = tool_input.get("project_dir")
-        base = Path(ctx.cwd) if project_dir is None else Path(str(project_dir))
+        base = Path(ctx.project_dir or ctx.cwd) if project_dir is None else Path(str(project_dir))
         skills = index_skills(project_dir=str(base))
-        return {"skills": [{"name": s.name, "summary": s.summary, "path": s.path} for s in skills]}
-
+        return {"skills": [{"name": s.name, "description": s.description, "summary": s.summary, "path": s.path} for s in skills]}

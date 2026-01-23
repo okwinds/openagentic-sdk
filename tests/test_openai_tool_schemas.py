@@ -21,7 +21,12 @@ class TestOpenAiToolSchemas(unittest.TestCase):
         self.assertEqual(props["questions"]["type"], "array")
         self.assertEqual(props["questions"]["items"]["type"], "object")
 
+    def test_skill_schema_exists(self) -> None:
+        schemas = tool_schemas_for_openai(["Skill"])
+        self.assertEqual(len(schemas), 1)
+        fn = schemas[0]["function"]
+        self.assertEqual(fn["name"], "Skill")
+
 
 if __name__ == "__main__":
     unittest.main()
-

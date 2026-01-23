@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, AsyncIterator, Mapping, Sequence
@@ -47,7 +48,12 @@ def _build_project_system_prompt(options: OpenAgentOptions) -> str | None:
     if settings.memory:
         parts.append(settings.memory.strip())
     if skills:
-        lines = ["## Skills", "Use `SkillList`/`SkillLoad` to inspect skills at runtime."]
+        lines = [
+            "## Skills",
+            "Use the `Skill` tool to list/load skills at runtime (preferred).",
+            "If the user asks what skills are available, you MUST call `Skill` with action='list' and answer based on its result (do not guess).",
+            "If the user asks to execute/run a skill (e.g. “执行技能 <name>”), you MUST load that skill (via `Skill` action='load' or `SkillLoad`) and follow its Workflow/Checklist. Do not ask for extra input unless the skill explicitly requires it.",
+        ]
         for s in skills:
             summary = f": {s.summary}" if s.summary else ""
             lines.append(f"- {s.name}{summary} ({s.path})")
@@ -59,6 +65,49 @@ def _build_project_system_prompt(options: OpenAgentOptions) -> str | None:
         parts.append("\n".join(lines))
     out = "\n\n".join([p for p in parts if p]).strip()
     return out or None
+
+
+_EXEC_SKILL_RE = re.compile(
+    r"^\s*(?:执行技能|运行技能|run skill|execute skill)\s*[:：]?\s*([A-Za-z0-9_.-]+)\s*$",
+    re.IGNORECASE,
+)
+
+
+def _maybe_expand_execute_skill_prompt(prompt: str, options: OpenAgentOptions) -> str:
+    """
+    Best-effort helper for users who type "执行技能<name>" expecting an automatic skill run.
+
+    If the prompt matches and the skill exists on disk, inline the SKILL.md content and instruct
+    the model to follow the Workflow without asking for extra input.
+    """
+    m = _EXEC_SKILL_RE.match(prompt or "")
+    if not m:
+        return prompt
+
+    skill_name = m.group(1)
+    project_dir = options.project_dir or options.cwd
+    skills = index_skills(project_dir=project_dir)
+    match = next((s for s in skills if s.name == skill_name), None)
+    if match is None:
+        return prompt
+
+    try:
+        raw = Path(match.path).read_text(encoding="utf-8", errors="replace")
+    except Exception:  # noqa: BLE001
+        return prompt
+
+    if len(raw) > 50_000:
+        raw = raw[:50_000] + "\n\n[truncated]\n"
+
+    return (
+        f"你正在执行技能 `{skill_name}`（来自 `.claude/skills`）。\n"
+        "除非技能文档明确要求，否则不要向用户询问额外的目标/输入。\n"
+        "请严格按技能的 Workflow/Checklist 执行。\n\n"
+        "SKILL.md:\n"
+        "-----\n"
+        f"{raw}\n"
+        "-----\n"
+    )
 
 
 def _render_system_prompt(base: str, active_skills: list[str]) -> str:
@@ -175,16 +224,18 @@ class AgentRuntime:
             yield final
             return
 
+        prompt3 = _maybe_expand_execute_skill_prompt(prompt2, options)
+
         store.append_event(
             session_id,
             UserMessage(
-                text=prompt2,
+                text=prompt3,
                 parent_tool_use_id=self._parent_tool_use_id,
                 agent_name=self._agent_name,
             ),
         )
 
-        messages.append({"role": "user", "content": prompt2})
+        messages.append({"role": "user", "content": prompt3})
         steps = 0
         while steps < options.max_steps:
             if options.abort_event is not None and getattr(options.abort_event, "is_set", lambda: False)():
@@ -704,7 +755,7 @@ class AgentRuntime:
             if isinstance(prompt_text, str) and prompt_text:
                 try:
                     tool = options.tools.get(tool_name)
-                    fetched = await tool.run(tool_input2, ToolContext(cwd=options.cwd))
+                    fetched = await tool.run(tool_input2, ToolContext(cwd=options.cwd, project_dir=options.project_dir))
                     page_text = fetched.get("text", "") if isinstance(fetched, dict) else ""
                     if not isinstance(page_text, str):
                         page_text = str(page_text)
@@ -760,7 +811,7 @@ class AgentRuntime:
         if tool_name == "TodoWrite":
             try:
                 tool = options.tools.get(tool_name)
-                output = await tool.run(tool_input2, ToolContext(cwd=options.cwd))
+                output = await tool.run(tool_input2, ToolContext(cwd=options.cwd, project_dir=options.project_dir))
                 todos = tool_input2.get("todos")
                 if isinstance(todos, list):
                     p = store.session_dir(session_id) / "todos.json"
@@ -799,7 +850,7 @@ class AgentRuntime:
 
         try:
             tool = options.tools.get(tool_name)
-            output = await tool.run(tool_input2, ToolContext(cwd=options.cwd))
+            output = await tool.run(tool_input2, ToolContext(cwd=options.cwd, project_dir=options.project_dir))
             output2, post_events, post_decision = await hooks.run_post_tool_use(
                 tool_name=tool_name,
                 tool_output=output,

@@ -20,7 +20,7 @@ class SkillLoadTool(Tool):
             raise ValueError("SkillLoad: 'name' must be a non-empty string")
 
         project_dir = tool_input.get("project_dir")
-        base = Path(ctx.cwd) if project_dir is None else Path(str(project_dir))
+        base = Path(ctx.project_dir or ctx.cwd) if project_dir is None else Path(str(project_dir))
         skills = index_skills(project_dir=str(base))
         match = next((s for s in skills if s.name == name), None)
         if match is None:
@@ -31,9 +31,9 @@ class SkillLoadTool(Tool):
         doc = parse_skill_markdown(content)
         return {
             "name": match.name,
+            "description": doc.description,
             "summary": doc.summary,
             "checklist": list(doc.checklist),
             "content": content,
             "path": str(path),
         }
-

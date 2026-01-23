@@ -171,6 +171,21 @@ def tool_schemas_for_openai(tool_names: Sequence[str], *, registry: ToolRegistry
                 },
             },
         },
+        "Skill": {
+            "type": "function",
+            "function": {
+                "name": "Skill",
+                "description": "List or load Skills from .claude/skills/**/SKILL.md.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "action": {"type": "string", "enum": ["list", "load"]},
+                        "name": {"type": "string"},
+                        "project_dir": {"type": "string"},
+                    },
+                },
+            },
+        },
         "SkillList": {
             "type": "function",
             "function": {

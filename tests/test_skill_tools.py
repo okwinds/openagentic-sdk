@@ -16,6 +16,7 @@ class TestSkillTools(unittest.TestCase):
             tool = SkillLoadTool()
             out = tool.run_sync({"name": "ex", "project_dir": str(root)}, ToolContext(cwd=str(root)))
             self.assertEqual(out["name"], "ex")
+            self.assertEqual(out["description"], "")
             self.assertEqual(out["summary"], "summary")
             self.assertEqual(out["checklist"], ["A"])
             self.assertIn("content", out)
@@ -23,4 +24,3 @@ class TestSkillTools(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
