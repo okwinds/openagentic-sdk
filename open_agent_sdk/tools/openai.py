@@ -231,7 +231,6 @@ def tool_schemas_for_openai(
                     "properties": {
                         "action": {"type": "string", "enum": ["list", "load"]},
                         "name": {"type": "string"},
-                        "project_dir": {"type": "string"},
                     },
                 },
             },
@@ -341,10 +340,6 @@ def tool_schemas_for_openai(
         schemas["Skill"]["function"]["parameters"]["properties"]["action"]["description"] = (
             "Either 'list' or 'load'. If omitted: list when name is missing, otherwise load."
         )
-        schemas["Skill"]["function"]["parameters"]["properties"]["project_dir"]["description"] = (
-            "Project directory that contains .claude/skills. Defaults to the current project."
-        )
-
     # Tool prompt injection (opencode-style templates).
     schemas["AskUserQuestion"]["function"]["description"] = render_tool_prompt("question", variables=prompt_vars)
     schemas["Read"]["function"]["description"] = render_tool_prompt("read", variables=prompt_vars)

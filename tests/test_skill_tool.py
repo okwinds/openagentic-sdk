@@ -27,7 +27,18 @@ class TestSkillTool(unittest.TestCase):
             self.assertEqual(loaded["description"], "desc")
             self.assertIn("SKILL.md", loaded["path"])
 
+    def test_list_with_empty_name_does_not_error(self) -> None:
+        with TemporaryDirectory() as td:
+            root = Path(td)
+            p = root / ".claude" / "skills" / "a"
+            p.mkdir(parents=True)
+            (p / "SKILL.md").write_text("---\nname: a\ndescription: d\n---\n", encoding="utf-8")
+
+            tool = SkillTool()
+            listed = tool.run_sync({"action": "list", "name": ""}, ToolContext(cwd="/", project_dir=str(root)))
+            names = [s.get("name") for s in listed.get("skills") or []]
+            self.assertEqual(names, ["a"])
+
 
 if __name__ == "__main__":
     unittest.main()
-

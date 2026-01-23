@@ -24,11 +24,23 @@ class SkillTool(Tool):
         action = tool_input.get("action")
         name = tool_input.get("name")
         project_dir = tool_input.get("project_dir")
-        base = Path(ctx.project_dir or ctx.cwd) if project_dir is None else Path(str(project_dir))
+
+        base_in: str | None
+        if isinstance(project_dir, str):
+            base_in = project_dir.strip() or None
+        else:
+            base_in = None
+
+        if base_in is None:
+            base = Path(ctx.project_dir or ctx.cwd)
+        else:
+            p = Path(base_in)
+            base = p if p.is_absolute() else Path(ctx.project_dir or ctx.cwd) / p
 
         action2 = str(action).strip().lower() if isinstance(action, str) else ""
+        name2 = name.strip() if isinstance(name, str) else ""
 
-        if action2 in ("", "list") and not isinstance(name, str):
+        if action2 in ("", "list") and not name2:
             skills = index_skills(project_dir=str(base))
             return {
                 "skills": [
@@ -42,16 +54,17 @@ class SkillTool(Tool):
                 ]
             }
 
-        if not isinstance(name, str) or not name:
+        if not name2:
             raise ValueError("Skill: 'name' must be a non-empty string for this action")
 
         if action2 not in ("", "load", "get", "read"):
             raise ValueError("Skill: 'action' must be 'list' or 'load'")
 
         skills = index_skills(project_dir=str(base))
-        match = next((s for s in skills if s.name == name), None)
+        match = next((s for s in skills if s.name == name2), None)
         if match is None:
-            raise FileNotFoundError(f"Skill: not found: {name}")
+            available = ", ".join([s.name for s in skills])
+            raise FileNotFoundError(f"Skill: not found: {name2}. Available skills: {available or 'none'}")
 
         path = Path(match.path)
         content = path.read_text(encoding="utf-8", errors="replace")
@@ -64,4 +77,3 @@ class SkillTool(Tool):
             "content": content,
             "path": str(path),
         }
-
