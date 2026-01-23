@@ -16,6 +16,13 @@ Notes:
 - Session logs are written under `.open-agent-sdk/` (gitignored).
 - Some examples use `TemporaryDirectory()` for the working directory (so files are ephemeral).
 
+## Output verbosity
+
+- Default: prints only the assistant text (human-friendly).
+- Debug: prints tool/hook/result summaries too.
+  - CLI flag: `--debug`
+  - Env var: `OPEN_AGENT_SDK_EXAMPLE_DEBUG=1`
+
 ## Core
 
 - `example/01_run_basic.py` — one-shot `run()`
@@ -23,6 +30,7 @@ Notes:
 - `example/03_query_messages_basic.py` — CAS-style `query_messages()` + partial streaming
 - `example/04_client_conversation.py` — `OpenAgentSDKClient` multi-turn reuse
 - `example/05_resume_session.py` — `resume=<session_id>` continues a session
+- `example/bugfix_auth.py` — real tool loop against `example/auth.py` (interactive approvals)
 
 ## Tools
 

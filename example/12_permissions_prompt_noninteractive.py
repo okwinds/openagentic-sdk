@@ -4,7 +4,7 @@ import asyncio
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from _common import rightcode_options
+from _common import EventPrinter, example_debug_enabled, rightcode_options
 
 from open_agent_sdk import OpenAgentOptions, query
 from open_agent_sdk.events import UserQuestion
@@ -12,7 +12,7 @@ from open_agent_sdk.permissions.gate import PermissionGate
 
 
 async def _always_yes(question: UserQuestion) -> str:
-    print(f"[user.question] {question.prompt} choices={question.choices}")
+    _ = question
     return "yes"
 
 
@@ -33,9 +33,9 @@ async def _run_case(*, root: Path, label: str, gate: PermissionGate) -> None:
         permission_gate=gate,
     )
     prompt = "Use the Read tool to read a.txt. Then reply with NONINTERACTIVE_OK."
+    printer = EventPrinter(debug=example_debug_enabled())
     async for ev in query(prompt=prompt, options=options):
-        if ev.type in ("user.question", "tool.use", "tool.result", "result"):
-            print(f"[{ev.type}] {ev}")
+        printer.on_event(ev)
 
 
 async def main() -> None:

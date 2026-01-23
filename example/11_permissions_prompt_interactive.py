@@ -4,7 +4,7 @@ import asyncio
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from _common import rightcode_options
+from _common import EventPrinter, example_debug_enabled, rightcode_options
 
 from open_agent_sdk import query
 
@@ -17,9 +17,9 @@ async def main() -> None:
         options = rightcode_options(cwd=root, project_dir=root, allowed_tools=["Write"])
         prompt = "Use the Write tool to create out.txt with content 'hello approvals'. Then reply with PERM_OK."
 
+        printer = EventPrinter(debug=example_debug_enabled())
         async for ev in query(prompt=prompt, options=options):
-            if ev.type in ("tool.use", "tool.result", "result", "user.question"):
-                print(f"[{ev.type}] {ev}")
+            printer.on_event(ev)
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from _common import rightcode_options
+from _common import EventPrinter, example_debug_enabled, rightcode_options
 
 from open_agent_sdk import query
 from open_agent_sdk.hooks.engine import HookEngine
@@ -33,20 +33,9 @@ async def main() -> None:
         options = replace(rightcode_options(cwd=root, project_dir=root, allowed_tools=["Read"]), hooks=hooks)
 
         prompt = "Use the Read tool to read file 'a.txt'. Then reply with HOOK_REWRITE_OK:<file contents>."
+        printer = EventPrinter(debug=example_debug_enabled())
         async for ev in query(prompt=prompt, options=options):
-            if ev.type == "assistant.delta":
-                print(ev.text_delta, end="", flush=True)
-            elif ev.type == "assistant.message":
-                print()
-                print(ev.text)
-            elif ev.type == "tool.use":
-                print(f"\n[tool.use] {ev.name} {ev.input}")
-            elif ev.type == "tool.result":
-                print(f"[tool.result] error={ev.is_error} output={ev.output}")
-            elif ev.type == "hook.event":
-                print(f"[hook.event] {ev.name} action={ev.action} matched={ev.matched}")
-            elif ev.type == "result":
-                print(f"[result] session_id={ev.session_id} stop_reason={ev.stop_reason}")
+            printer.on_event(ev)
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from _common import rightcode_options
+from _common import EventPrinter, example_debug_enabled, rightcode_options
 
 from open_agent_sdk import create_sdk_mcp_server, query, tool
 
@@ -30,18 +30,9 @@ async def main() -> None:
             "Call the tool mcp__calc__add with a=1 and b=2. "
             "After getting the tool result, reply with exactly: MCP_OK:<sum>."
         )
+        printer = EventPrinter(debug=example_debug_enabled())
         async for ev in query(prompt=prompt, options=options):
-            if ev.type == "assistant.delta":
-                print(ev.text_delta, end="", flush=True)
-            elif ev.type == "assistant.message":
-                print()
-                print(ev.text)
-            elif ev.type == "tool.use":
-                print(f"\n[tool.use] {ev.name} {ev.input}")
-            elif ev.type == "tool.result":
-                print(f"[tool.result] error={ev.is_error} output={ev.output}")
-            elif ev.type == "result":
-                print(f"[result] session_id={ev.session_id} stop_reason={ev.stop_reason}")
+            printer.on_event(ev)
 
 
 if __name__ == "__main__":
