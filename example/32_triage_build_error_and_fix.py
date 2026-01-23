@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from _common import EventPrinter, example_artifact_dir, example_debug_enabled, require_command, rightcode_options
+from _common import example_artifact_dir, require_command, rightcode_options
+from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled
 
 from open_agent_sdk import query
 
@@ -30,12 +31,13 @@ async def main() -> None:
         "4) Use Bash to run: python -m py_compile bad.py again (it should pass)\n"
         "Finally reply with TRIAGE_OK."
     )
-    printer = EventPrinter(debug=example_debug_enabled())
+    debug = console_debug_enabled()
+    printer = ConsoleRenderer(debug=debug)
     async for ev in query(prompt=prompt, options=options):
         printer.on_event(ev)
 
     print(f"Wrote: {bad}")
-    if example_debug_enabled():
+    if debug:
         print(f"[debug] bad.py now:\n{bad.read_text(encoding='utf-8', errors='replace')}")
 
 

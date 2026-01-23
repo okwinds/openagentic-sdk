@@ -4,7 +4,8 @@ import asyncio
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from _common import EventPrinter, example_debug_enabled, rightcode_options
+from _common import rightcode_options
+from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled
 
 from open_agent_sdk import query
 
@@ -18,11 +19,12 @@ async def main() -> None:
             "Then use the Read tool to read it back. "
             "Finally reply with exactly: WRITE_OK:<file contents>."
         )
-        printer = EventPrinter(debug=example_debug_enabled())
+        debug = console_debug_enabled()
+        printer = ConsoleRenderer(debug=debug)
         async for ev in query(prompt=prompt, options=options):
             printer.on_event(ev)
         if (root / "out.txt").exists():
-            if example_debug_enabled():
+            if debug:
                 print(f"out.txt={ (root / 'out.txt').read_text(encoding='utf-8')!r }")
 
 

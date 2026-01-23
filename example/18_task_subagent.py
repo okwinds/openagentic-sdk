@@ -5,7 +5,8 @@ from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from _common import EventPrinter, example_debug_enabled, rightcode_options
+from _common import rightcode_options
+from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled
 
 from open_agent_sdk import query
 from open_agent_sdk.options import AgentDefinition
@@ -29,7 +30,7 @@ async def main() -> None:
             "Call the Task tool exactly once with agent='helper' and prompt='Say hi'. "
             "After the tool returns, summarize the child's final_text."
         )
-        printer = EventPrinter(debug=example_debug_enabled())
+        printer = ConsoleRenderer(debug=console_debug_enabled())
         async for ev in query(prompt=prompt, options=options):
             printer.on_event(ev)
 

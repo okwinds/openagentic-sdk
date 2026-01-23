@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import asyncio
 
-from _common import example_debug_enabled, repo_root, rightcode_options
+from _common import repo_root, rightcode_options
+from open_agent_sdk.console import console_debug_enabled
 
 from open_agent_sdk.client import OpenAgentSDKClient
 from open_agent_sdk.messages import ResultMessage
@@ -10,7 +11,7 @@ from open_agent_sdk.messages import ResultMessage
 
 async def main() -> None:
     options = rightcode_options(cwd=repo_root(), project_dir=repo_root(), allowed_tools=[])
-    debug = example_debug_enabled()
+    debug = console_debug_enabled()
 
     async with OpenAgentSDKClient(options) as client:
         await client.query("Say: CLIENT_TURN_1_OK")

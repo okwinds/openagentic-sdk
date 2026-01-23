@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 from dataclasses import replace
 
-from _common import example_debug_enabled, repo_root, rightcode_options
+from _common import repo_root, rightcode_options
+from open_agent_sdk.console import console_debug_enabled
 
 from open_agent_sdk import run
 
@@ -11,7 +12,7 @@ from open_agent_sdk import run
 async def main() -> None:
     options1 = rightcode_options(cwd=repo_root(), project_dir=repo_root(), allowed_tools=[])
     r1 = await run(prompt="Say: RESUME_TURN_1_OK", options=options1)
-    debug = example_debug_enabled()
+    debug = console_debug_enabled()
     print(f"turn1: {r1.final_text}")
     print(f"session_id={r1.session_id}")
 

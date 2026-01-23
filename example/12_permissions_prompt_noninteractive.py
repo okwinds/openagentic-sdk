@@ -4,7 +4,8 @@ import asyncio
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from _common import EventPrinter, example_debug_enabled, rightcode_options
+from _common import rightcode_options
+from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled
 
 from open_agent_sdk import OpenAgentOptions, query
 from open_agent_sdk.events import UserQuestion
@@ -33,7 +34,7 @@ async def _run_case(*, root: Path, label: str, gate: PermissionGate) -> None:
         permission_gate=gate,
     )
     prompt = "Use the Read tool to read a.txt. Then reply with NONINTERACTIVE_OK."
-    printer = EventPrinter(debug=example_debug_enabled())
+    printer = ConsoleRenderer(debug=console_debug_enabled())
     async for ev in query(prompt=prompt, options=options):
         printer.on_event(ev)
 

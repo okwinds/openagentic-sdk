@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import json
-from pathlib import Path
 
-from _common import EventPrinter, example_artifact_dir, example_debug_enabled, repo_root, rightcode_options
+from _common import example_artifact_dir, repo_root, rightcode_options
+from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled
 
 from open_agent_sdk import query
 
@@ -37,7 +37,7 @@ async def main() -> None:
         "2) edit_mode='insert', cell_type='code', new_source='print(\"NOTEBOOK_OK\")'\n"
         "Then reply with NOTEBOOK_EDIT_OK."
     )
-    printer = EventPrinter(debug=example_debug_enabled())
+    printer = ConsoleRenderer(debug=console_debug_enabled())
     async for ev in query(prompt=prompt, options=options):
         printer.on_event(ev)
 

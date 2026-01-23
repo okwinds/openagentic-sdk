@@ -5,7 +5,7 @@ import os
 import shutil
 import sys
 from pathlib import Path
-from typing import Any, Awaitable, Mapping, Sequence
+from typing import Any, Awaitable
 
 sys.dont_write_bytecode = True
 
@@ -80,7 +80,7 @@ def rightcode_options(
     interactive: bool = True,
     approver: Approver | None = None,
     user_answerer: UserAnswerer | None = None,
-) -> OpenAgentOptions:
+    ) -> OpenAgentOptions:
     api_key = require_env("RIGHTCODE_API_KEY")
     model = os.environ.get("RIGHTCODE_MODEL", "gpt-5.2")
     return OpenAgentOptions(
@@ -100,162 +100,3 @@ def rightcode_options(
         ),
         setting_sources=["project"],
     )
-
-
-def env_bool(name: str, default: bool = False) -> bool:
-    raw = os.environ.get(name)
-    if raw is None:
-        return default
-    return str(raw).strip().lower() in ("1", "true", "yes", "y", "on")
-
-
-def example_debug_enabled(argv: Sequence[str] | None = None) -> bool:
-    argv2 = list(sys.argv[1:] if argv is None else argv)
-    return env_bool("OPEN_AGENT_SDK_EXAMPLE_DEBUG", False) or ("--debug" in argv2)
-
-
-class EventPrinter:
-    def __init__(self, *, debug: bool = False) -> None:
-        self._debug = debug
-        self._saw_delta = False
-        self._tool_use_names: dict[str, str] = {}
-        self._todo_inputs: dict[str, list[dict[str, Any]]] = {}
-
-    def on_event(self, ev: Any) -> None:
-        t = getattr(ev, "type", None)
-        if t == "assistant.delta":
-            delta = getattr(ev, "text_delta", "")
-            if isinstance(delta, str) and delta:
-                print(delta, end="", flush=True)
-                self._saw_delta = True
-            return
-
-        if t == "assistant.message":
-            # Streaming providers already emitted the full text via assistant.delta.
-            # Avoid printing the final assistant.message again (would duplicate output).
-            if self._saw_delta:
-                print()
-                self._saw_delta = False
-                return
-            text = getattr(ev, "text", "")
-            if not isinstance(text, str) or not text:
-                return
-            agent = getattr(ev, "agent_name", None)
-            prefix = f"[{agent}] " if isinstance(agent, str) and agent else ""
-            print(prefix + text)
-            return
-
-        if t == "user.question":
-            prompt = getattr(ev, "prompt", "")
-            choices = getattr(ev, "choices", None)
-            if isinstance(prompt, str) and prompt:
-                if isinstance(choices, list) and choices:
-                    print(f"[question] {prompt} choices={choices}")
-                else:
-                    print(f"[question] {prompt}")
-            return
-
-        if t == "tool.use":
-            tool_use_id = getattr(ev, "tool_use_id", "")
-            name = getattr(ev, "name", "")
-            tool_input = getattr(ev, "input", None)
-            if isinstance(tool_use_id, str) and tool_use_id and isinstance(name, str) and name:
-                self._tool_use_names[tool_use_id] = name
-                if name == "TodoWrite" and isinstance(tool_input, dict):
-                    todos = tool_input.get("todos")
-                    if isinstance(todos, list):
-                        todo_objs: list[dict[str, Any]] = []
-                        for x in todos:
-                            if isinstance(x, dict):
-                                todo_objs.append(dict(x))
-                        self._todo_inputs[tool_use_id] = todo_objs
-
-            if not self._debug:
-                return
-
-            agent = getattr(ev, "agent_name", None)
-            prefix = f"[{agent}] " if isinstance(agent, str) and agent else ""
-            if isinstance(name, str) and name:
-                if isinstance(tool_input, dict) and tool_input:
-                    print(f"{prefix}[tool] {name} {tool_input}")
-                else:
-                    print(f"{prefix}[tool] {name}")
-            return
-
-        if t == "tool.result" and not self._debug:
-            tool_use_id = getattr(ev, "tool_use_id", "")
-            if not isinstance(tool_use_id, str) or not tool_use_id:
-                return
-            if self._tool_use_names.get(tool_use_id) != "TodoWrite":
-                return
-
-            output = getattr(ev, "output", None)
-            stats = None
-            if isinstance(output, dict):
-                stats = output.get("stats")
-            if isinstance(stats, dict):
-                total = stats.get("total")
-                pending = stats.get("pending")
-                in_progress = stats.get("in_progress")
-                completed = stats.get("completed")
-                print(f"TODOs: total={total} pending={pending} in_progress={in_progress} completed={completed}")
-            else:
-                print("TODOs updated")
-
-            todos = self._todo_inputs.get(tool_use_id) or []
-            for item in todos:
-                status = item.get("status")
-                active_form = item.get("activeForm") or item.get("content") or ""
-                if not isinstance(active_form, str):
-                    active_form = str(active_form)
-                if not isinstance(status, str):
-                    status = "pending"
-                print(f"- [{status}] {active_form}")
-            return
-
-        if not self._debug:
-            return
-
-        if t == "tool.result":
-            tool_use_id = getattr(ev, "tool_use_id", "")
-            is_error = bool(getattr(ev, "is_error", False))
-            error_message = getattr(ev, "error_message", None)
-            status = "error" if is_error else "ok"
-            if isinstance(tool_use_id, str) and tool_use_id:
-                line = f"[tool.result] {tool_use_id} {status}"
-            else:
-                line = f"[tool.result] {status}"
-            if is_error and isinstance(error_message, str) and error_message:
-                line += f" msg={error_message!r}"
-            print(line)
-            return
-
-        if t == "hook.event":
-            name = getattr(ev, "name", "")
-            hook_point = getattr(ev, "hook_point", "")
-            action = getattr(ev, "action", None)
-            matched = getattr(ev, "matched", None)
-            line = f"[hook] {hook_point}:{name}"
-            if action is not None:
-                line += f" action={action}"
-            if matched is not None:
-                line += f" matched={matched}"
-            print(line)
-            return
-
-        if t == "skill.activated":
-            name = getattr(ev, "name", "")
-            if isinstance(name, str) and name:
-                print(f"[skill] activated {name}")
-            return
-
-        if t == "result":
-            stop_reason = getattr(ev, "stop_reason", None)
-            session_id = getattr(ev, "session_id", None)
-            line = "[done]"
-            if isinstance(stop_reason, str) and stop_reason:
-                line += f" stop_reason={stop_reason}"
-            if isinstance(session_id, str) and session_id:
-                line += f" session_id={session_id}"
-            print(line)
-            return

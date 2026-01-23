@@ -4,7 +4,8 @@ import asyncio
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from _common import EventPrinter, example_debug_enabled, rightcode_options
+from _common import rightcode_options
+from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled
 
 from open_agent_sdk import query
 
@@ -14,7 +15,7 @@ async def main() -> None:
         root = Path(td)
         options = rightcode_options(cwd=root, project_dir=root, allowed_tools=["Bash"])
         prompt = "Use the Bash tool to run `echo hello bash`. Then reply with exactly: BASH_OK:<stdout>."
-        printer = EventPrinter(debug=example_debug_enabled())
+        printer = ConsoleRenderer(debug=console_debug_enabled())
         async for ev in query(prompt=prompt, options=options):
             printer.on_event(ev)
 

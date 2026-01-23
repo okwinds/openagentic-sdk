@@ -5,7 +5,8 @@ from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from _common import EventPrinter, example_debug_enabled, rightcode_options
+from _common import rightcode_options
+from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled
 
 from open_agent_sdk import query
 from open_agent_sdk.hooks.engine import HookEngine
@@ -22,7 +23,7 @@ async def main() -> None:
         hooks = HookEngine(pre_tool_use=[HookMatcher(name="block-bash", tool_name_pattern="Bash", hook=_block_bash)])
         options = replace(rightcode_options(cwd=root, project_dir=root, allowed_tools=["Bash"]), hooks=hooks)
         prompt = "Use the Bash tool to run: echo blocked-by-hook. Then reply with HOOK_BLOCK_OK."
-        printer = EventPrinter(debug=example_debug_enabled())
+        printer = ConsoleRenderer(debug=console_debug_enabled())
         async for ev in query(prompt=prompt, options=options):
             printer.on_event(ev)
 

@@ -5,7 +5,8 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
-from _common import example_debug_enabled, repo_root, rightcode_options
+from _common import repo_root, rightcode_options
+from open_agent_sdk.console import console_debug_enabled
 
 from open_agent_sdk import run
 
@@ -31,11 +32,10 @@ async def main() -> None:
     session_root = Path(options1.session_root) if options1.session_root else (repo_root() / ".open-agent-sdk")
     todo_file = session_root / "sessions" / session_id / "todos.json"
     print(f"todos_path={todo_file}")
-    if example_debug_enabled() and todo_file.exists():
+    if console_debug_enabled() and todo_file.exists():
         data = json.loads(todo_file.read_text(encoding="utf-8"))
         print(json.dumps(data, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
     asyncio.run(main())
-

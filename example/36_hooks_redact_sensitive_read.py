@@ -5,7 +5,8 @@ from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from _common import EventPrinter, example_debug_enabled, rightcode_options
+from _common import rightcode_options
+from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled
 
 from open_agent_sdk import query
 from open_agent_sdk.hooks.engine import HookEngine
@@ -42,11 +43,10 @@ async def main() -> None:
             hooks=hooks,
         )
         prompt = "Use Read to read secrets.txt, then reply with REDACT_OK and show the content you saw."
-        printer = EventPrinter(debug=example_debug_enabled())
+        printer = ConsoleRenderer(debug=console_debug_enabled())
         async for ev in query(prompt=prompt, options=options):
             printer.on_event(ev)
 
 
 if __name__ == "__main__":
     asyncio.run(main())
-

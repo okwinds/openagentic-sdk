@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 
-from _common import EventPrinter, example_debug_enabled, repo_root, require_env_simple, rightcode_options
+from _common import example_artifact_dir, repo_root, require_env_simple, rightcode_options
+from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled
 
 from open_agent_sdk import query
 
@@ -14,8 +14,7 @@ async def main() -> None:
         help="This example uses the WebSearch tool (Tavily). Set TAVILY_API_KEY then rerun.",
     )
 
-    out_dir = repo_root() / ".open-agent-sdk" / "example-artifacts" / "22"
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = example_artifact_dir("22")
     report_path = out_dir / "report.md"
 
     options = rightcode_options(
@@ -32,7 +31,7 @@ async def main() -> None:
         "3) Use Write to create report.md containing: the query, the chosen URL, and the 5 key points.\n"
         "Finally reply with REPORT_OK and mention report.md was written."
     )
-    printer = EventPrinter(debug=example_debug_enabled())
+    printer = ConsoleRenderer(debug=console_debug_enabled())
     async for ev in query(prompt=prompt, options=options):
         printer.on_event(ev)
 

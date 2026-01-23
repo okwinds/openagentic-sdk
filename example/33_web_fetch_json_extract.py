@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import asyncio
 
-from _common import EventPrinter, example_debug_enabled, repo_root, rightcode_options
+from _common import repo_root, rightcode_options
+from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled
 
 from open_agent_sdk import query
 
@@ -19,11 +20,10 @@ async def main() -> None:
         "Call WebFetch with url='https://httpbin.org/json' and prompt='Extract the slideshow title and list slide titles. "
         "Include token JSON_OK.'. Then reply with the extracted data."
     )
-    printer = EventPrinter(debug=example_debug_enabled())
+    printer = ConsoleRenderer(debug=console_debug_enabled())
     async for ev in query(prompt=prompt, options=options):
         printer.on_event(ev)
 
 
 if __name__ == "__main__":
     asyncio.run(main())
-

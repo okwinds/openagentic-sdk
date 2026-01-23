@@ -5,7 +5,8 @@ from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from _common import EventPrinter, example_debug_enabled, rightcode_options
+from _common import rightcode_options
+from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled
 
 from open_agent_sdk import create_sdk_mcp_server, query, tool
 
@@ -41,11 +42,10 @@ async def main() -> None:
             "2) Take the result and call mcp__calc__mul with a=<sum> b=3.\n"
             "Finally reply with MCP_PIPELINE_OK:<result>."
         )
-        printer = EventPrinter(debug=example_debug_enabled())
+        printer = ConsoleRenderer(debug=console_debug_enabled())
         async for ev in query(prompt=prompt, options=options):
             printer.on_event(ev)
 
 
 if __name__ == "__main__":
     asyncio.run(main())
-
