@@ -25,6 +25,9 @@ class ReadTool(Tool):
 
         offset = tool_input.get("offset")
         limit = tool_input.get("limit")
+        if offset == 0:
+            # Models sometimes pass 0 when they mean "from the start".
+            offset = 1
         if offset is not None and (not isinstance(offset, int) or offset < 1):
             raise ValueError("Read: 'offset' must be a positive integer (1-based)")
         if limit is not None and (not isinstance(limit, int) or limit < 0):

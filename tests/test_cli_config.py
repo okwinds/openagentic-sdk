@@ -31,6 +31,7 @@ class TestCliConfig(unittest.TestCase):
             )
             self.assertTrue(opts.permission_gate.interactive)
             self.assertIsNotNone(opts.permission_gate.interactive_approver)
+            self.assertTrue(opts.include_partial_messages)
         finally:
             os.environ.pop("RIGHTCODE_API_KEY", None)
 

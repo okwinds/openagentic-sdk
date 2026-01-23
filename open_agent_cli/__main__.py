@@ -15,6 +15,10 @@ from .run_cmd import run_once
 from .style import StyleConfig
 
 
+def default_permission_mode() -> str:
+    return os.getenv("OA_PERMISSION_MODE") or "default"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     ns = parser.parse_args(argv)
@@ -24,7 +28,7 @@ def main(argv: list[str] | None = None) -> int:
 
     cwd = os.getcwd()
     project_dir = cwd
-    permission_mode = os.getenv("OA_PERMISSION_MODE", "prompt")
+    permission_mode = default_permission_mode()
     interactive = bool(getattr(sys.stdin, "isatty", lambda: False)())
     style = StyleConfig(color="auto")
 

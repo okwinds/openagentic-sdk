@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 import sys
 from dataclasses import replace
 from typing import TextIO
 
-from open_agent_sdk.client import OpenAgentSDKClient
-from open_agent_sdk.console.renderer import ConsoleRenderer
-from open_agent_sdk.console.run import console_client_turn
 from open_agent_sdk.options import OpenAgentOptions
+from open_agent_sdk.runtime import AgentRuntime
+from open_agent_sdk.sessions.store import FileSessionStore
 from open_agent_sdk.skills.index import index_skills
 
 from .style import (
@@ -25,6 +25,7 @@ from .style import (
     fg_red,
     should_colorize,
 )
+from .trace import TraceRenderer
 
 
 def parse_repl_command(line: str) -> tuple[str, str] | None:
@@ -62,11 +63,24 @@ async def run_chat(
     stdout: TextIO,
 ) -> int:
     enable_color = should_colorize(color_config, isatty=getattr(stdout, "isatty", lambda: False)(), platform=sys.platform)
+    show_thinking_hint = os.getenv("OA_SHOW_THINKING", "1").strip().lower() not in ("0", "false", "no", "off")
+    is_tty = bool(getattr(stdout, "isatty", lambda: False)())
+    trace_enabled = os.getenv("OA_TRACE", "1").strip().lower() not in ("0", "false", "no", "off")
 
     render_stream = StylizingStream(stdout, highlighter=InlineCodeHighlighter(enabled=enable_color)) if enable_color else stdout
-    renderer = ConsoleRenderer(stream=render_stream, debug=debug)
-    client = OpenAgentSDKClient(options)
+    renderer = TraceRenderer(stream=render_stream, color=enable_color, show_hooks=debug) if trace_enabled else TraceRenderer(stream=render_stream, color=False, show_hooks=debug)
     turn = 0
+
+    store = options.session_store
+    if store is None:
+        root = options.session_root
+        if root is None:
+            env = os.environ.get("OPEN_AGENT_SDK_HOME")
+            root = os.path.expanduser(env) if env else os.path.join(os.path.expanduser("~"), ".open-agent-sdk")
+        store = FileSessionStore(root_dir=__import__("pathlib").Path(root))
+    opts = replace(options, session_store=store)
+    session_id = opts.resume
+    current_abort_event: asyncio.Event | None = None
 
     _print(stdout, dim("Type /help for commands.", enabled=enable_color))
     while True:
@@ -125,16 +139,16 @@ async def run_chat(
                 continue
             if name == "debug":
                 debug = not debug
-                renderer = ConsoleRenderer(stream=render_stream, debug=debug)
                 _print(stdout, dim(f"debug={'on' if debug else 'off'}", enabled=enable_color))
                 continue
             if name == "interrupt":
-                await client.interrupt()
+                if current_abort_event is not None:
+                    current_abort_event.set()
                 _print(stdout, dim("interrupt signaled", enabled=enable_color))
                 continue
             if name == "new":
-                await client.disconnect()
-                client = OpenAgentSDKClient(replace(options, resume=None))
+                session_id = None
+                opts = replace(opts, resume=None)
                 turn = 0
                 _print(stdout, dim("started new session", enabled=enable_color))
                 continue
@@ -170,10 +184,25 @@ async def run_chat(
 
         try:
             turn += 1
-            await client.connect()
-            await console_client_turn(client=client, prompt=prompt, renderer=renderer)
+            if show_thinking_hint and is_tty:
+                _print(stdout, dim("thinking…", enabled=enable_color))
+
+            abort_event = asyncio.Event()
+            current_abort_event = abort_event
+            run_opts = replace(opts, resume=session_id, abort_event=abort_event)
+            runtime = AgentRuntime(run_opts)
+            async for ev in runtime.query(prompt):
+                if getattr(ev, "type", None) == "system.init":
+                    sid = getattr(ev, "session_id", None)
+                    if isinstance(sid, str) and sid:
+                        session_id = sid
+                renderer.on_event(ev)
+            current_abort_event = None
+            if session_id:
+                opts = replace(opts, resume=session_id)
         except KeyboardInterrupt:
-            await client.interrupt()
+            if current_abort_event is not None:
+                current_abort_event.set()
             _print(stdout, dim("interrupted", enabled=enable_color))
             continue
         except SystemExit as e:

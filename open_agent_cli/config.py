@@ -114,6 +114,7 @@ def build_options(
         allowed_tools=allowed_tools,
         permission_gate=gate,
         hooks=hooks,
+        include_partial_messages=interactive,
         session_root=session_root_path,
         resume=resume,
         setting_sources=["project"],
