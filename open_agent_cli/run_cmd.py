@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from typing import TextIO
 
 from open_agent_sdk.api import run
+from open_agent_sdk.console.renderer import ConsoleRenderer
 from open_agent_sdk.console.run import console_query
 from open_agent_sdk.options import OpenAgentOptions
+
+from .style import InlineCodeHighlighter, StyleConfig, StylizingStream, should_colorize
 
 
 def format_run_json(*, final_text: str, session_id: str, stop_reason: str | None) -> str:
@@ -27,6 +31,7 @@ async def run_once(
     stream: bool,
     json_output: bool,
     stdout: TextIO | None = None,
+    color_config: StyleConfig | None = None,
 ) -> int:
     out = stdout or sys.stdout
     if json_output:
@@ -40,11 +45,14 @@ async def run_once(
         return 0
 
     if stream:
-        await console_query(prompt=prompt, options=options)
+        cfg = color_config or StyleConfig(color="auto")
+        enable_color = should_colorize(cfg, isatty=getattr(out, "isatty", lambda: False)(), platform=sys.platform)
+        stream2 = StylizingStream(out, highlighter=InlineCodeHighlighter(enabled=enable_color)) if enable_color else out
+        renderer = ConsoleRenderer(stream=stream2, debug=False)
+        await console_query(prompt=prompt, options=options, renderer=renderer)
         return 0
 
     res = await run(prompt=prompt, options=options)
     out.write((res.final_text or "") + "\n")
     out.flush()
     return 0
-

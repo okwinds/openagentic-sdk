@@ -59,7 +59,7 @@ def main(argv: list[str] | None = None) -> int:
         prompt = str(getattr(ns, "prompt", "") or "")
         stream = bool(getattr(ns, "stream", True))
         json_output = bool(getattr(ns, "json", False))
-        return int(asyncio.run(run_once(opts, prompt, stream=stream, json_output=json_output)))
+        return int(asyncio.run(run_once(opts, prompt, stream=stream, json_output=json_output, color_config=style)))
 
     if ns.command == "logs":
         root = getattr(ns, "session_root", None)

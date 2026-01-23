@@ -3,7 +3,10 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from typing import Sequence
+import sys
 
+from open_agent_sdk.hooks.engine import HookEngine
+from open_agent_sdk.hooks.models import HookDecision, HookMatcher
 from open_agent_sdk.options import OpenAgentOptions
 from open_agent_sdk.permissions.gate import PermissionGate
 from open_agent_sdk.permissions.interactive import InteractiveApprover
@@ -39,7 +42,6 @@ def _env_float(name: str, default: float) -> float:
 
 def build_provider_rightcode() -> OpenAICompatibleProvider:
     return OpenAICompatibleProvider(
-        name="rightcode",
         base_url=os.getenv("RIGHTCODE_BASE_URL", "https://www.right.codes/codex/v1"),
         timeout_s=_env_float("RIGHTCODE_TIMEOUT_S", 120.0),
         max_retries=_env_int("RIGHTCODE_MAX_RETRIES", 2),
@@ -67,6 +69,42 @@ def build_options(
         interactive_approver=InteractiveApprover(input_fn=input) if interactive else None,
     )
 
+    marker = "## OA CLI Context"
+    platform = sys.platform
+    project_dir2 = project_dir or cwd
+
+    async def _inject_cli_context(payload: dict) -> HookDecision:  # type: ignore[type-arg]
+        msgs = payload.get("messages")
+        if not isinstance(msgs, list) or not msgs:
+            return HookDecision()
+
+        block = "\n".join(
+            [
+                marker,
+                f"- platform: {platform}",
+                f"- cwd: {cwd}",
+                f"- project_dir: {project_dir2}",
+                "- These values are authoritative for this session.",
+                "- If the user asks for the current directory, answer using `cwd` directly (do not guess).",
+            ]
+        ).strip()
+
+        first = msgs[0] if isinstance(msgs[0], dict) else None
+        if first and first.get("role") == "system" and isinstance(first.get("content"), str):
+            content = first["content"]
+            if marker in content:
+                return HookDecision(action="noop")
+            new_first = dict(first)
+            new_first["content"] = block + "\n\n" + content
+            return HookDecision(override_messages=[new_first, *msgs[1:]], action="inject_cli_context")
+
+        return HookDecision(override_messages=[{"role": "system", "content": block}, *msgs], action="inject_cli_context")
+
+    hooks = HookEngine(
+        before_model_call=[HookMatcher(name="oa-cli-context", tool_name_pattern="*", hook=_inject_cli_context)],
+        enable_message_rewrite_hooks=True,
+    )
+
     return OpenAgentOptions(
         provider=build_provider_rightcode(),
         api_key=require_env("RIGHTCODE_API_KEY"),
@@ -75,6 +113,7 @@ def build_options(
         project_dir=project_dir,
         allowed_tools=allowed_tools,
         permission_gate=gate,
+        hooks=hooks,
         session_root=session_root_path,
         resume=resume,
         setting_sources=["project"],
