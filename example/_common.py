@@ -118,6 +118,8 @@ class EventPrinter:
     def __init__(self, *, debug: bool = False) -> None:
         self._debug = debug
         self._saw_delta = False
+        self._tool_use_names: dict[str, str] = {}
+        self._todo_inputs: dict[str, list[dict[str, Any]]] = {}
 
     def on_event(self, ev: Any) -> None:
         t = getattr(ev, "type", None)
@@ -129,12 +131,15 @@ class EventPrinter:
             return
 
         if t == "assistant.message":
-            text = getattr(ev, "text", "")
-            if not isinstance(text, str) or not text:
-                return
+            # Streaming providers already emitted the full text via assistant.delta.
+            # Avoid printing the final assistant.message again (would duplicate output).
             if self._saw_delta:
                 print()
                 self._saw_delta = False
+                return
+            text = getattr(ev, "text", "")
+            if not isinstance(text, str) or not text:
+                return
             agent = getattr(ev, "agent_name", None)
             prefix = f"[{agent}] " if isinstance(agent, str) and agent else ""
             print(prefix + text)
@@ -150,12 +155,24 @@ class EventPrinter:
                     print(f"[question] {prompt}")
             return
 
-        if not self._debug:
-            return
-
         if t == "tool.use":
+            tool_use_id = getattr(ev, "tool_use_id", "")
             name = getattr(ev, "name", "")
             tool_input = getattr(ev, "input", None)
+            if isinstance(tool_use_id, str) and tool_use_id and isinstance(name, str) and name:
+                self._tool_use_names[tool_use_id] = name
+                if name == "TodoWrite" and isinstance(tool_input, dict):
+                    todos = tool_input.get("todos")
+                    if isinstance(todos, list):
+                        todo_objs: list[dict[str, Any]] = []
+                        for x in todos:
+                            if isinstance(x, dict):
+                                todo_objs.append(dict(x))
+                        self._todo_inputs[tool_use_id] = todo_objs
+
+            if not self._debug:
+                return
+
             agent = getattr(ev, "agent_name", None)
             prefix = f"[{agent}] " if isinstance(agent, str) and agent else ""
             if isinstance(name, str) and name:
@@ -163,6 +180,40 @@ class EventPrinter:
                     print(f"{prefix}[tool] {name} {tool_input}")
                 else:
                     print(f"{prefix}[tool] {name}")
+            return
+
+        if t == "tool.result" and not self._debug:
+            tool_use_id = getattr(ev, "tool_use_id", "")
+            if not isinstance(tool_use_id, str) or not tool_use_id:
+                return
+            if self._tool_use_names.get(tool_use_id) != "TodoWrite":
+                return
+
+            output = getattr(ev, "output", None)
+            stats = None
+            if isinstance(output, dict):
+                stats = output.get("stats")
+            if isinstance(stats, dict):
+                total = stats.get("total")
+                pending = stats.get("pending")
+                in_progress = stats.get("in_progress")
+                completed = stats.get("completed")
+                print(f"TODOs: total={total} pending={pending} in_progress={in_progress} completed={completed}")
+            else:
+                print("TODOs updated")
+
+            todos = self._todo_inputs.get(tool_use_id) or []
+            for item in todos:
+                status = item.get("status")
+                active_form = item.get("activeForm") or item.get("content") or ""
+                if not isinstance(active_form, str):
+                    active_form = str(active_form)
+                if not isinstance(status, str):
+                    status = "pending"
+                print(f"- [{status}] {active_form}")
+            return
+
+        if not self._debug:
             return
 
         if t == "tool.result":
