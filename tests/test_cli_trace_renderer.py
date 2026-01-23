@@ -24,6 +24,37 @@ class TestCliTraceRenderer(unittest.TestCase):
         self.assertIn("pwd", s)
         self.assertIn("exit_code=0", s)
 
+    def test_rg_help_is_printed_when_missing_pattern(self) -> None:
+        from open_agent_cli.trace import TraceRenderer
+
+        out = io.StringIO()
+        r = TraceRenderer(stream=out, color=False)
+        r.on_event(ToolUse(tool_use_id="t1", name="Bash", input={"command": "rg"}))
+        r.on_event(
+            ToolResult(
+                tool_use_id="t1",
+                output={"exit_code": 2, "output": "rg: ripgrep requires at least one pattern to execute a search\n"},
+                is_error=False,
+            )
+        )
+        self.assertIn("hint:", out.getvalue())
+
+    def test_rg_help_is_printed_when_rg_missing(self) -> None:
+        from open_agent_cli.trace import TraceRenderer
+
+        out = io.StringIO()
+        r = TraceRenderer(stream=out, color=False)
+        r.on_event(ToolUse(tool_use_id="t1", name="Bash", input={"command": "rg foo"}))
+        r.on_event(
+            ToolResult(
+                tool_use_id="t1",
+                output={"exit_code": 127, "output": "bash: rg: command not found\n"},
+                is_error=False,
+            )
+        )
+        s = out.getvalue()
+        self.assertIn("winget install BurntSushi.ripgrep.MSVC", s)
+
     def test_streaming_deltas_do_not_duplicate_final(self) -> None:
         from open_agent_cli.trace import TraceRenderer
 

@@ -80,10 +80,20 @@ def _summarize_tool_result(
         if isinstance(exit_code, int):
             lines.append(f"exit_code={exit_code}")
         out = output.get("output")
-        if isinstance(out, str) and out.strip():
-            chunk = out.strip("\n").splitlines()
+        out_text = out if isinstance(out, str) else ""
+        if out_text.strip():
+            chunk = out_text.strip("\n").splitlines()
             for ln in chunk[: max(0, max_lines)]:
                 lines.append(ln)
+
+        # Friendly hints for common rg failures.
+        lower = out_text.lower()
+        if "ripgrep requires at least one pattern" in lower:
+            lines.append("hint: run `rg <pattern> [path]` (e.g. `rg \"TODO\" .`)")
+        if ("rg: command not found" in lower or "bash: rg: command not found" in lower) and isinstance(exit_code, int):
+            lines.append("hint: install ripgrep (rg) then retry")
+            lines.append("  - Windows: `winget install BurntSushi.ripgrep.MSVC`")
+            lines.append("  - WSL/Ubuntu: `sudo apt-get update && sudo apt-get install -y ripgrep`")
         return lines or ["ok"]
 
     if name == "Grep" and isinstance(output, dict):

@@ -47,6 +47,11 @@ Install (editable):
 
 `pip install -e .`
 
+Optional (recommended): install ripgrep (`rg`) so the agent can search your repo quickly when using shell tools.
+
+- Windows (PowerShell): `winget install BurntSushi.ripgrep.MSVC`
+- WSL/Ubuntu: `sudo apt-get update && sudo apt-get install -y ripgrep`
+
 Commands:
 
 - `oa chat` (multi-turn REPL; `/help` for slash commands)

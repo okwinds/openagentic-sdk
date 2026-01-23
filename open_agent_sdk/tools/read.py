@@ -23,8 +23,28 @@ class ReadTool(Tool):
         if not p.is_absolute():
             p = Path(ctx.cwd) / p
 
-        offset = tool_input.get("offset")
-        limit = tool_input.get("limit")
+        offset_raw = tool_input.get("offset")
+        limit_raw = tool_input.get("limit")
+
+        def _coerce_int(v: Any, *, name: str) -> int | None:
+            if v is None:
+                return None
+            if isinstance(v, bool):
+                raise ValueError(f"Read: '{name}' must be an integer")
+            if isinstance(v, int):
+                return v
+            if isinstance(v, str):
+                s = v.strip()
+                if not s:
+                    return None
+                try:
+                    return int(s)
+                except ValueError as e:
+                    raise ValueError(f"Read: '{name}' must be an integer") from e
+            raise ValueError(f"Read: '{name}' must be an integer")
+
+        offset = _coerce_int(offset_raw, name="offset")
+        limit = _coerce_int(limit_raw, name="limit")
         if offset == 0:
             # Models sometimes pass 0 when they mean "from the start".
             offset = 1
