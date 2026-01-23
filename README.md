@@ -2,19 +2,38 @@
 
 Pure-Python, open-source Agent SDK inspired by the Claude Agent SDK programming model.
 
-Status: early scaffold (no published API stability yet).
+Status: early (APIs may change), but the core runtime + tool loop are usable today.
+
+This project exists for people who want the “agent runtime” experience (multi-turn sessions, tool calls, approvals,
+skills/commands from `.claude/`, resumable logs) in a small, hackable Python codebase.
+
+See `README.zh_cn.md` for a Chinese overview.
+
+## What you get
+
+- **A minimal agent runtime**: `run()` / streaming `query()` / CAS-style `query_messages()`.
+- **A persistent session model**: durable `session_id`, `events.jsonl`, `resume=<session_id>`.
+- **A real tool loop**: model requests tools → permission gate → tool execution → tool results → model continues.
+- **Human-friendly console output** by default (debug mode available).
+- **`.claude` compatibility**: project memory, slash commands, and skills on disk.
+- **OpenAI + OpenAI-compatible providers** (the examples use a real OpenAI-compatible backend by default).
 
 ## Quickstart (local)
 
+Prereqs: Python 3.11+.
+
+Install (optional, for editable dev):
+
+`pip install -e .`
+
 Run unit tests:
 
-`PYTHONPATH=packages/sdk/open-agent-sdk python3 -m unittest discover -s packages/sdk/open-agent-sdk/tests -p 'test_*.py' -q`
+`python3 -m unittest -q`
 
 Run examples:
 
 - `python3 example/01_run_basic.py`
-- See `example/README.md` for the full list.
-  - Requires `RIGHTCODE_API_KEY` and network access (uses `OpenAICompatibleProvider`).
+- See `example/README.md` for the full list and required env vars.
 
 ## Usage
 
@@ -66,6 +85,23 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
+OpenAI-compatible backend (the examples default to RIGHTCODE):
+
+```py
+from open_agent_sdk import OpenAgentOptions, run
+from open_agent_sdk.providers.openai_compatible import OpenAICompatibleProvider
+from open_agent_sdk.permissions import PermissionGate
+
+options = OpenAgentOptions(
+    provider=OpenAICompatibleProvider(base_url="https://www.right.codes/codex/v1"),
+    model="gpt-5.2",
+    api_key="...",  # RIGHTCODE_API_KEY
+    cwd=".",
+    permission_gate=PermissionGate(permission_mode="prompt", interactive=True),
+    setting_sources=["project"],
+)
+```
+
 ## Built-in tools
 
 Default registry includes:
@@ -77,7 +113,11 @@ Default registry includes:
 - `WebSearch` (Tavily; requires `TAVILY_API_KEY`)
 - `TodoWrite`
 - `SlashCommand` (loads `.claude/commands/<name>.md`)
-- `SkillList`, `SkillLoad`, `SkillActivate` (for `.claude/skills/**/SKILL.md`)
+- `Skill` (CAS-style single tool for `.claude/skills/**/SKILL.md`)
+- `SkillList`, `SkillLoad`, `SkillActivate` (legacy/compat)
+
+For OpenAI-compatible providers, tool schemas include long-form “how to use this tool” descriptions (opencode-style)
+to make the model follow rules more reliably.
 
 ## `.claude` compatibility
 
@@ -89,9 +129,16 @@ When `setting_sources=["project"]`, the SDK can index:
 
 When `setting_sources=["project"]`, `query()` prepends a `system` message with project memory + skills/commands index; `SkillActivate` adds an "Active Skills" section persisted via `skill.activated` events (survives `resume`).
 
-## MCP (placeholder)
+## Console output (human-first)
 
-MCP is not implemented yet, but the API is expected to reserve fields like `mcp_servers` in options.
+Examples use `open_agent_sdk.console.ConsoleRenderer`, which:
+
+- Prints assistant text by default (human-friendly).
+- In debug mode (`--debug` or `OPEN_AGENT_SDK_CONSOLE_DEBUG=1`), prints tool/hook/result summaries.
+
+Try the interactive CLI chat example:
+
+- `python3 example/45_cli_chat.py`
 
 ## Event compatibility
 
