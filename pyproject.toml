@@ -19,3 +19,6 @@ package-dir = {"" = "."}
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["open_agent_sdk*"]
+
+[tool.setuptools.package-data]
+open_agent_sdk = ["tool_prompts/*.txt"]

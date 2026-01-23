@@ -1,0 +1,14 @@
+Load a skill to get detailed instructions for a specific task.
+Skills provide specialized knowledge and step-by-step guidance.
+Use this when a task matches an available skill's description.
+
+Only the skills listed here are available:
+
+<available_skills>
+{{available_skills}}
+</available_skills>
+
+Usage:
+- To list skills: call `Skill` with `action="list"` (or omit `action` and `name`)
+- To load a skill: call `Skill` with `action="load"` and `name="<skill-name>"`
+- If `action` is omitted: list if `name` is missing, otherwise load

@@ -14,7 +14,7 @@ class WriteTool(Tool):
     description: str = "Create or overwrite a file."
 
     async def run(self, tool_input: Mapping[str, Any], ctx: ToolContext) -> dict[str, Any]:
-        file_path = tool_input.get("file_path")
+        file_path = tool_input.get("file_path", tool_input.get("filePath"))
         content = tool_input.get("content")
         overwrite = bool(tool_input.get("overwrite", False))
 

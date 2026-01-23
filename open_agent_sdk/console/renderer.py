@@ -23,6 +23,49 @@ def _safe_json_loads(text: str | None) -> dict[str, Any]:
     return obj if isinstance(obj, dict) else {}
 
 
+def _render_skill_list(skills: Any) -> list[str]:
+    if not isinstance(skills, list) or not skills:
+        return []
+    lines: list[str] = []
+    for s in skills:
+        if not isinstance(s, dict):
+            continue
+        name = s.get("name") if isinstance(s.get("name"), str) else ""
+        desc = s.get("description") if isinstance(s.get("description"), str) else ""
+        summary = s.get("summary") if isinstance(s.get("summary"), str) else ""
+        blurb = desc or summary
+        if name and blurb:
+            lines.append(f"- `{name}` — {blurb}")
+        elif name:
+            lines.append(f"- `{name}`")
+    return lines
+
+
+def _render_skill_use_line(tool_input: Any) -> str | None:
+    if not isinstance(tool_input, dict):
+        return None
+    action = tool_input.get("action")
+    name = tool_input.get("name")
+    action2 = str(action).strip().lower() if isinstance(action, str) else ""
+    name2 = str(name).strip() if isinstance(name, str) else ""
+    if not action2:
+        action2 = "load" if name2 else "list"
+    if action2 == "list":
+        return "正在列出Skills...\n"
+    if action2 in ("load", "get", "read") and name2:
+        return f"正在执行Skill：{name2}...\n"
+    return "正在执行Skill...\n"
+
+
+def _render_skill_loaded_line(output: Any) -> str | None:
+    if not isinstance(output, dict):
+        return None
+    name = output.get("name")
+    if isinstance(name, str) and name.strip():
+        return f"Skill已加载：{name.strip()}\n"
+    return None
+
+
 @dataclass
 class ConsoleRenderer:
     stream: TextIO = sys.stdout
@@ -78,6 +121,11 @@ class ConsoleRenderer:
                         self._todo_inputs[tool_use_id] = [dict(x) for x in todos if isinstance(x, dict)]
 
             if not self.debug:
+                if name == "Skill":
+                    line = _render_skill_use_line(tool_input)
+                    if line:
+                        self.stream.write(line)
+                        self.stream.flush()
                 return
             agent = getattr(ev, "agent_name", None)
             prefix = f"[{agent}] " if isinstance(agent, str) and agent else ""
@@ -91,7 +139,11 @@ class ConsoleRenderer:
 
         if t == "tool.result" and not self.debug:
             tool_use_id = getattr(ev, "tool_use_id", "")
-            if isinstance(tool_use_id, str) and tool_use_id and self._tool_use_names.get(tool_use_id) == "TodoWrite":
+            if not isinstance(tool_use_id, str) or not tool_use_id:
+                return
+            tool_name = self._tool_use_names.get(tool_use_id)
+
+            if tool_name == "TodoWrite":
                 output = getattr(ev, "output", None)
                 stats = output.get("stats") if isinstance(output, dict) else None
                 if isinstance(stats, dict):
@@ -109,6 +161,28 @@ class ConsoleRenderer:
                     active = item.get("activeForm") or item.get("content") or ""
                     self.stream.write(f"- [{status}] {active}\n")
                 self.stream.flush()
+                return
+
+            if tool_name == "Skill":
+                if bool(getattr(ev, "is_error", False)):
+                    error_message = getattr(ev, "error_message", None)
+                    msg = error_message if isinstance(error_message, str) and error_message else "unknown error"
+                    self.stream.write(f"Skill执行失败：{msg}\n")
+                    self.stream.flush()
+                    return
+                output = getattr(ev, "output", None)
+                if isinstance(output, dict):
+                    loaded = _render_skill_loaded_line(output)
+                    if loaded:
+                        self.stream.write(loaded)
+                    lines = _render_skill_list(output.get("skills"))
+                    if lines:
+                        self.stream.write("Available skills:\n")
+                        for ln in lines:
+                            self.stream.write(ln + "\n")
+                        self.stream.flush()
+                return
+
             return
 
         if not self.debug:
@@ -199,6 +273,11 @@ class ConsoleRenderer:
                             todos = tool_input.get("todos")
                             if isinstance(todos, list):
                                 self._todo_inputs[tool_use_id] = [dict(x) for x in todos if isinstance(x, dict)]
+                        if not self.debug and name == "Skill":
+                            line = _render_skill_use_line(tool_input)
+                            if line:
+                                self.stream.write(line)
+                                self.stream.flush()
                         if self.debug:
                             self.stream.write(f"[tool] {name} {tool_input}\n")
                             self.stream.flush()
@@ -225,6 +304,20 @@ class ConsoleRenderer:
                             active = item.get("activeForm") or item.get("content") or ""
                             self.stream.write(f"- [{status}] {active}\n")
                         self.stream.flush()
+                    elif isinstance(tool_use_id, str) and tool_use_id and self._tool_use_names.get(tool_use_id) == "Skill":
+                        if bool(is_error):
+                            self.stream.write("Skill执行失败\n")
+                            self.stream.flush()
+                            continue
+                        loaded = _render_skill_loaded_line(out)
+                        if loaded:
+                            self.stream.write(loaded)
+                        lines = _render_skill_list(out.get("skills"))
+                        if lines:
+                            self.stream.write("Available skills:\n")
+                            for ln in lines:
+                                self.stream.write(ln + "\n")
+                            self.stream.flush()
                     elif self.debug:
                         self.stream.write(f"[tool.result] {tool_use_id} error={bool(is_error)}\n")
                         self.stream.flush()

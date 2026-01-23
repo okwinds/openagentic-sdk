@@ -69,7 +69,46 @@ class TestToolCasCompat(unittest.TestCase):
             self.assertEqual(out["count"], 1)
             self.assertEqual(out["files"], [str(root / "a.txt")])
 
+    def test_read_accepts_file_path_alias_filePath(self) -> None:
+        with TemporaryDirectory() as td:
+            root = Path(td)
+            p = root / "a.txt"
+            p.write_text("hello", encoding="utf-8")
+            tool = ReadTool()
+            out = tool.run_sync({"filePath": str(p)}, ToolContext(cwd=str(root)))
+            self.assertIn("hello", out["content"])
+
+    def test_write_accepts_file_path_alias_filePath(self) -> None:
+        with TemporaryDirectory() as td:
+            root = Path(td)
+            tool = WriteTool()
+            out = tool.run_sync({"filePath": "a.txt", "content": "hi", "overwrite": True}, ToolContext(cwd=str(root)))
+            self.assertEqual(Path(out["file_path"]).read_text(encoding="utf-8"), "hi")
+
+    def test_edit_accepts_oldString_newString_replaceAll(self) -> None:
+        with TemporaryDirectory() as td:
+            root = Path(td)
+            p = root / "a.txt"
+            p.write_text("x x x", encoding="utf-8")
+            tool = EditTool()
+            out = tool.run_sync(
+                {"filePath": str(p), "oldString": "x", "newString": "y", "replaceAll": True},
+                ToolContext(cwd=str(root)),
+            )
+            self.assertEqual(p.read_text(encoding="utf-8"), "y y y")
+            self.assertEqual(out["replacements"], 3)
+
+    def test_bash_accepts_workdir_override(self) -> None:
+        with TemporaryDirectory() as td:
+            root = Path(td)
+            d1 = root / "d1"
+            d2 = root / "d2"
+            d1.mkdir()
+            d2.mkdir()
+            tool = BashTool(timeout_s=5.0)
+            out = tool.run_sync({"command": "pwd", "workdir": str(d2)}, ToolContext(cwd=str(d1)))
+            self.assertIn(str(d2), out["stdout"])
+
 
 if __name__ == "__main__":
     unittest.main()
-

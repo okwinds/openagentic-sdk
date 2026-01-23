@@ -72,6 +72,11 @@ _EXEC_SKILL_RE = re.compile(
     re.IGNORECASE,
 )
 
+_LIST_SKILLS_RE = re.compile(
+    r"^\s*(?:what\s+skills\s+are\s+available\??|list\s+skills|有哪些技能\??|有什么技能\??|技能有哪些\??)\s*$",
+    re.IGNORECASE,
+)
+
 
 def _maybe_expand_execute_skill_prompt(prompt: str, options: OpenAgentOptions) -> str:
     """
@@ -107,6 +112,26 @@ def _maybe_expand_execute_skill_prompt(prompt: str, options: OpenAgentOptions) -
         "-----\n"
         f"{raw}\n"
         "-----\n"
+    )
+
+
+def _maybe_expand_list_skills_prompt(prompt: str, options: OpenAgentOptions) -> str:
+    """
+    Best-effort helper for users who ask to list available skills without explicitly naming the tool.
+    """
+    if not _LIST_SKILLS_RE.match(prompt or ""):
+        return prompt
+
+    # If there are no skills, keep the prompt as-is.
+    project_dir = options.project_dir or options.cwd
+    skills = index_skills(project_dir=project_dir)
+    if not skills:
+        return prompt
+
+    return (
+        "List the available Skills for this project.\n"
+        "You MUST call the `Skill` tool with action='list'.\n"
+        "Then present the results as a short bullet list: `name` — description (or summary).\n"
     )
 
 
@@ -225,6 +250,7 @@ class AgentRuntime:
             return
 
         prompt3 = _maybe_expand_execute_skill_prompt(prompt2, options)
+        prompt3 = _maybe_expand_list_skills_prompt(prompt3, options)
 
         store.append_event(
             session_id,
@@ -265,7 +291,11 @@ class AgentRuntime:
 
             tool_schemas: Sequence[Mapping[str, Any]] = ()
             if getattr(options.provider, "name", None) in ("openai", "openai-compatible"):
-                tool_schemas = tool_schemas_for_openai(tool_names, registry=options.tools)
+                tool_schemas = tool_schemas_for_openai(
+                    tool_names,
+                    registry=options.tools,
+                    context={"cwd": options.cwd, "project_dir": options.project_dir},
+                )
 
             if getattr(self, "_base_system_prompt", None) and messages and messages[0].get("role") == "system":
                 messages[0] = {

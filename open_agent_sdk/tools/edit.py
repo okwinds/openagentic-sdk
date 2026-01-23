@@ -13,10 +13,10 @@ class EditTool(Tool):
     description: str = "Apply a precise edit (string replace) to a file."
 
     async def run(self, tool_input: Mapping[str, Any], ctx: ToolContext) -> dict[str, Any]:
-        file_path = tool_input.get("file_path")
-        old = tool_input.get("old", tool_input.get("old_string"))
-        new = tool_input.get("new", tool_input.get("new_string"))
-        replace_all = tool_input.get("replace_all")
+        file_path = tool_input.get("file_path", tool_input.get("filePath"))
+        old = tool_input.get("old", tool_input.get("old_string", tool_input.get("oldString")))
+        new = tool_input.get("new", tool_input.get("new_string", tool_input.get("newString")))
+        replace_all = tool_input.get("replace_all", tool_input.get("replaceAll"))
         count = tool_input.get("count", 1 if not replace_all else 0)
         before = tool_input.get("before")
         after = tool_input.get("after")

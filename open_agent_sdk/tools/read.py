@@ -15,7 +15,7 @@ class ReadTool(Tool):
     max_bytes: int = 1024 * 1024
 
     async def run(self, tool_input: Mapping[str, Any], ctx: ToolContext) -> dict[str, Any]:
-        file_path = tool_input.get("file_path")
+        file_path = tool_input.get("file_path", tool_input.get("filePath"))
         if not isinstance(file_path, str) or not file_path:
             raise ValueError("Read: 'file_path' must be a non-empty string")
 

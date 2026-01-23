@@ -52,7 +52,7 @@ Notes:
 - `example/16_slash_command.py` — `SlashCommand` from `.claude/commands`
 - `example/17_skill_list_load_activate.py` — `SkillList`/`SkillLoad`/`SkillActivate` + system prompt update
 - `example/41_skill_main_process.py` — run `.claude/skills/main-process` (delegates to `drawing`)
-- `example/42_skill_main_process_min.py` — CAS-style `Skill` tool: prompt `What Skills are available?`
+- `example/42_skill_list.py` — CAS-style `Skill` tool: prompt `What Skills are available?`
 
 ## Subagents / MCP / Sessions
 
