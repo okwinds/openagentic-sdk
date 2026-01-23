@@ -1,0 +1,74 @@
+import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from open_agent_sdk.options import OpenAgentOptions
+from open_agent_sdk.permissions.gate import PermissionGate
+from open_agent_sdk.providers.base import ModelOutput, ToolCall
+from open_agent_sdk.sessions.store import FileSessionStore
+
+
+class FakeProvider:
+    name = "fake"
+
+    def __init__(self) -> None:
+        self.seen_messages = []
+        self.calls = 0
+
+    async def complete(self, *, model, messages, tools=(), api_key=None):
+        self.seen_messages.append(list(messages))
+        self.calls += 1
+        if self.calls == 1:
+            return ModelOutput(
+                assistant_text=None,
+                tool_calls=[ToolCall("tc1", "Read", {"file_path": "a.txt"})],
+            )
+        return ModelOutput(assistant_text="done", tool_calls=[])
+
+
+class TestResumeRebuild(unittest.IsolatedAsyncioTestCase):
+    async def test_resume_rebuilds_messages(self) -> None:
+        with TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "a.txt").write_text("hello", encoding="utf-8")
+            store = FileSessionStore(root_dir=root)
+
+            provider1 = FakeProvider()
+            options1 = OpenAgentOptions(
+                provider=provider1,
+                model="fake",
+                api_key="x",
+                cwd=str(root),
+                permission_gate=PermissionGate(permission_mode="bypass"),
+                session_store=store,
+            )
+
+            import open_agent_sdk
+
+            events1 = []
+            async for e in open_agent_sdk.query(prompt="read it", options=options1):
+                events1.append(e)
+            sid = next(e.session_id for e in events1 if getattr(e, "type", None) == "system.init")
+
+            provider2 = FakeProvider()
+            options2 = OpenAgentOptions(
+                provider=provider2,
+                model="fake",
+                api_key="x",
+                cwd=str(root),
+                permission_gate=PermissionGate(permission_mode="bypass"),
+                session_store=store,
+                resume=sid,
+            )
+
+            async for _ in open_agent_sdk.query(prompt="continue", options=options2):
+                pass
+
+            first = provider2.seen_messages[0]
+            roles = [m.get("role") for m in first]
+            self.assertIn("tool", roles)
+
+
+if __name__ == "__main__":
+    unittest.main()
+
