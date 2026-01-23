@@ -218,6 +218,31 @@ def tool_schemas_for_openai(tool_names: Sequence[str], *, registry: ToolRegistry
                 },
             },
         },
+        "TodoWrite": {
+            "type": "function",
+            "function": {
+                "name": "TodoWrite",
+                "description": "Write or update a TODO list for the current session.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "todos": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "content": {"type": "string"},
+                                    "status": {"type": "string", "enum": ["pending", "in_progress", "completed"]},
+                                    "activeForm": {"type": "string"},
+                                },
+                                "required": ["content", "status", "activeForm"],
+                            },
+                        }
+                    },
+                    "required": ["todos"],
+                },
+            },
+        },
     }
 
     out: list[Mapping[str, Any]] = []

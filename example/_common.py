@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Any, Awaitable, Mapping, Sequence
@@ -41,6 +42,20 @@ def require_env(name: str) -> str:
         f"Missing required env var: {name}\n"
         "Set RIGHTCODE_API_KEY (and optionally RIGHTCODE_BASE_URL/RIGHTCODE_MODEL/RIGHTCODE_TIMEOUT_S) then rerun."
     )
+
+
+def require_env_simple(name: str, *, help: str) -> str:
+    val = os.environ.get(name)
+    if val:
+        return val
+    raise SystemExit(f"Missing required env var: {name}\n{help}")
+
+
+def require_command(name: str, *, help: str) -> str:
+    path = shutil.which(name)
+    if path:
+        return path
+    raise SystemExit(f"Missing required command: {name}\n{help}")
 
 
 def rightcode_provider() -> OpenAICompatibleProvider:

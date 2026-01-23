@@ -15,6 +15,7 @@ from .notebook_edit import NotebookEditTool
 from .web_fetch import WebFetchTool
 from .web_search_tavily import WebSearchTool
 from .write import WriteTool
+from .todo_write import TodoWriteTool
 
 
 def default_tool_registry() -> ToolRegistry:
@@ -34,5 +35,6 @@ def default_tool_registry() -> ToolRegistry:
             SkillListTool(),
             SkillLoadTool(),
             SkillActivateTool(),
+            TodoWriteTool(),
         ]
     )

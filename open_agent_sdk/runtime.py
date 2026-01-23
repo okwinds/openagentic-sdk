@@ -757,6 +757,46 @@ class AgentRuntime:
                 yield result
                 return
 
+        if tool_name == "TodoWrite":
+            try:
+                tool = options.tools.get(tool_name)
+                output = await tool.run(tool_input2, ToolContext(cwd=options.cwd))
+                todos = tool_input2.get("todos")
+                if isinstance(todos, list):
+                    p = store.session_dir(session_id) / "todos.json"
+                    p.write_text(json.dumps({"todos": todos}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+                output2, post_events, post_decision = await hooks.run_post_tool_use(
+                    tool_name=tool_name,
+                    tool_output=output,
+                    context=ctx,
+                )
+                for he in post_events:
+                    store.append_event(session_id, he)
+                    yield he
+                if post_decision is not None and post_decision.block:
+                    raise RuntimeError(post_decision.block_reason or "blocked by hook")
+                result = ToolResult(
+                    tool_use_id=tool_call.tool_use_id,
+                    output=output2,
+                    is_error=False,
+                    parent_tool_use_id=self._parent_tool_use_id,
+                    agent_name=self._agent_name,
+                )
+            except Exception as e:  # noqa: BLE001
+                result = ToolResult(
+                    tool_use_id=tool_call.tool_use_id,
+                    output=None,
+                    is_error=True,
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    parent_tool_use_id=self._parent_tool_use_id,
+                    agent_name=self._agent_name,
+                )
+            store.append_event(session_id, result)
+            yield result
+            return
+
         try:
             tool = options.tools.get(tool_name)
             output = await tool.run(tool_input2, ToolContext(cwd=options.cwd))

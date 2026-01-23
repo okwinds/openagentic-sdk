@@ -75,6 +75,7 @@ Default registry includes:
 - `Bash`
 - `WebFetch`
 - `WebSearch` (Tavily; requires `TAVILY_API_KEY`)
+- `TodoWrite`
 - `SlashCommand` (loads `.claude/commands/<name>.md`)
 - `SkillList`, `SkillLoad`, `SkillActivate` (for `.claude/skills/**/SKILL.md`)
 

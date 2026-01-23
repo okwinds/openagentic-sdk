@@ -55,3 +55,35 @@ Notes:
 - `example/18_task_subagent.py` — `Task` tool spawns a subagent (`AgentDefinition`)
 - `example/19_mcp_sdk_tool.py` — SDK-defined MCP tool via `@tool` + `create_sdk_mcp_server`
 - `example/20_inspect_session_log.py` — print `meta.json` + tail `events.jsonl` for a session
+
+## Advanced (more realistic workflows)
+
+Web (requires network):
+- `example/21_web_fetch_summarize.py` — `WebFetch` + in-tool summarization prompt
+- `example/22_web_search_then_fetch_report.py` — `WebSearch` → `WebFetch` → `Write` report (`TAVILY_API_KEY` required)
+- `example/23_web_search_domain_filters.py` — `WebSearch` domain allowlist (`TAVILY_API_KEY` required)
+- `example/33_web_fetch_json_extract.py` — `WebFetch` JSON endpoint + extraction prompt
+- `example/34_web_fetch_compare_and_write.py` — fetch 2 pages and write comparison
+
+Notebook:
+- `example/24_notebook_edit_research_report.py` — generate a notebook report via `NotebookEdit`
+- `example/25_notebook_edit_tutorial_builder.py` — replace + insert cells via `NotebookEdit`
+
+Interaction + TODOs:
+- `example/26_ask_user_question_onboarding.py` — `AskUserQuestion` → `TodoWrite` (interactive answers)
+- `example/27_todo_write_create_list.py` — create a TODO list via `TodoWrite`
+- `example/28_todo_write_iterate_status.py` — update TODO statuses via repeated `TodoWrite`
+- `example/29_research_to_todos.py` — `WebSearch` → `TodoWrite` (`TAVILY_API_KEY` required)
+- `example/30_project_onboarding_notes.py` — `Read`/`Grep`/`Write` + `TodoWrite`
+- `example/40_resume_continues_todos.py` — `resume` + persisted `todos.json`
+
+Bash-based (requires `bash` in PATH):
+- `example/31_generate_changelog_from_git.py` — `Bash` git log → `Write` changelog
+- `example/32_triage_build_error_and_fix.py` — `Bash` compile error → `Edit` fix → `Bash` re-check
+- `example/35_file_refactor_with_checks.py` — `Read`/`Edit` + `Bash` checks
+
+Hooks / restrictions / MCP pipelines:
+- `example/36_hooks_redact_sensitive_read.py` — post-tool hook redacts `Read` output
+- `example/37_allowed_tools_sandbox_demo.py` — `allowed_tools` denial + recovery
+- `example/38_mcp_two_tools_pipeline.py` — compose two MCP SDK tools
+- `example/39_multi_turn_client_workflow.py` — multi-turn `OpenAgentSDKClient` + `TodoWrite`
