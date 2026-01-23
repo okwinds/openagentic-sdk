@@ -23,7 +23,7 @@ Notes:
 - Default: prints only the assistant text (human-friendly).
 - Debug: prints tool/hook/result summaries too.
   - CLI flag: `--debug`
-  - Env var: `OPENAGENTIC_SDK_CONSOLE_DEBUG=1` (legacy: `OPEN_AGENT_SDK_CONSOLE_DEBUG=1`, `OPEN_AGENT_SDK_EXAMPLE_DEBUG=1`)
+  - Env var: `OPENAGENTIC_SDK_CONSOLE_DEBUG=1`
 
 ## Core
 

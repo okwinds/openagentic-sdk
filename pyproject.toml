@@ -31,7 +31,7 @@ package-dir = {"" = "."}
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["openagentic_sdk*", "openagentic_cli*", "open_agent_sdk*", "open_agent_cli*"]
+include = ["openagentic_sdk*", "openagentic_cli*"]
 
 [tool.setuptools.package-data]
 openagentic_sdk = ["tool_prompts/*.txt"]

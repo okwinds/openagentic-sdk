@@ -53,7 +53,7 @@
 - `oa resume <session_id>`（等价于 `oa chat --resume <session_id>`）
 - `oa logs <session_id>`（汇总 `events.jsonl`）
 
-默认会话目录为 `~/.openagentic-sdk`（可用 `OPENAGENTIC_SDK_HOME` 覆盖；兼容 `OPEN_AGENT_SDK_HOME`）。
+默认会话目录为 `~/.openagentic-sdk`（可用 `OPENAGENTIC_SDK_HOME` 覆盖）。
 
 示例默认需要环境变量（至少要有 `RIGHTCODE_API_KEY`）。在 PowerShell 下可以这样检查：
 
@@ -105,7 +105,7 @@
 示例使用 `openagentic_sdk.console.ConsoleRenderer`：
 
 - 默认只输出 assistant 文本（面向人类）
-- 调试输出：`--debug` 或 `OPENAGENTIC_SDK_CONSOLE_DEBUG=1`（兼容 `OPEN_AGENT_SDK_CONSOLE_DEBUG=1`）
+- 调试输出：`--debug` 或 `OPENAGENTIC_SDK_CONSOLE_DEBUG=1`
 
 推荐先跑一个交互式 CLI 多轮示例（几乎能覆盖常用 tools）：
 

@@ -47,7 +47,7 @@
 - `oa run "prompt"`：一次性执行（支持流式与 JSON 输出选项）
 - `oa resume <session_id>`：恢复会话（等价于 `oa chat --resume <session_id>`）
 - `oa logs <session_id>`：汇总 `events.jsonl`，便于快速回顾对话与工具调用
-- 会话目录：默认 `~/.openagentic-sdk`（可用 `OPENAGENTIC_SDK_HOME` 覆盖；兼容 `OPEN_AGENT_SDK_HOME`）
+- 会话目录：默认 `~/.openagentic-sdk`（可用 `OPENAGENTIC_SDK_HOME` 覆盖）
 
 ## 现状与成熟度
 - 文档标注为早期阶段（API 可能变化），但核心 runtime + tool loop 已可用。

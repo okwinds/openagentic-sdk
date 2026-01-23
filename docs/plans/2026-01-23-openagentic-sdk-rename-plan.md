@@ -2,9 +2,9 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Rename the *distribution/project branding* from `open-agent-sdk` → `openagentic-sdk`, and (optionally) rename defaults like the session directory, while keeping compatibility via shims/migration.
+**Goal:** Rename the *distribution/project branding* to `openagentic-sdk`, and rename defaults like the session directory, for a clean break (no legacy shims).
 
-**Architecture:** Treat “PyPI distribution name” and “Python import package name” as separate layers. Keep CLI command `oa`. If doing a deep rename, keep `open_agent_sdk` / `open_agent_cli` as compatibility shims that forward to `openagentic_sdk` / `openagentic_cli`.
+**Architecture:** Treat “PyPI distribution name” and “Python import package name” as separate layers. Keep CLI command `oa`. In a deep rename, remove legacy shim packages for a clean break.
 
 **Tech Stack:** Python 3.11+, `setuptools` + `pyproject.toml`, `unittest`.
 
@@ -16,14 +16,14 @@ Pick one:
 
 - **Option A: Distribution rename only**
   - PyPI name: `openagentic-sdk`
-  - Imports remain: `open_agent_sdk`, `open_agent_cli`
+  - Imports remain unchanged
   - CLI remains: `oa`
   - Session dir/env vars remain, minimizing breaking changes.
 
 - **Option B: Deep rename (breaking-change managed)**
   - New imports: `openagentic_sdk` / `openagentic_cli`
-  - Keep `open_agent_sdk` / `open_agent_cli` as shim packages (forward + `DeprecationWarning`)
-  - Rename default session dir and env vars, with legacy alias/migration.
+  - Remove legacy shim packages (clean break)
+  - Rename default session dir and env vars
 
 Everything below is written so Option A can be completed first, then Option B applied incrementally.
 

@@ -61,7 +61,7 @@ Commands:
 - `oa resume <session_id>` (alias of `oa chat --resume <session_id>`)
 - `oa logs <session_id>` (summarize `events.jsonl`)
 
-Sessions are stored under `~/.openagentic-sdk` by default (override with `OPENAGENTIC_SDK_HOME`; legacy: `OPEN_AGENT_SDK_HOME`).
+Sessions are stored under `~/.openagentic-sdk` by default (override with `OPENAGENTIC_SDK_HOME`).
 
 ## Publishing
 
@@ -166,7 +166,7 @@ When `setting_sources=["project"]`, `query()` prepends a `system` message with p
 Examples use `openagentic_sdk.console.ConsoleRenderer`, which:
 
 - Prints assistant text by default (human-friendly).
-- In debug mode (`--debug` or `OPENAGENTIC_SDK_CONSOLE_DEBUG=1`; legacy: `OPEN_AGENT_SDK_CONSOLE_DEBUG=1`), prints tool/hook/result summaries.
+- In debug mode (`--debug` or `OPENAGENTIC_SDK_CONSOLE_DEBUG=1`), prints tool/hook/result summaries.
 
 Try the interactive CLI chat example:
 

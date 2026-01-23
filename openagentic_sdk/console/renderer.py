@@ -9,13 +9,7 @@ from typing import Any, TextIO
 
 def console_debug_enabled(argv: list[str] | None = None) -> bool:
     argv2 = sys.argv[1:] if argv is None else argv
-    env = (
-        os.environ.get("OPENAGENTIC_SDK_CONSOLE_DEBUG")
-        or os.environ.get("OPENAGENTIC_SDK_EXAMPLE_DEBUG")
-        or os.environ.get("OPEN_AGENT_SDK_CONSOLE_DEBUG")
-        or os.environ.get("OPEN_AGENT_SDK_EXAMPLE_DEBUG")
-        or ""
-    )
+    env = os.environ.get("OPENAGENTIC_SDK_CONSOLE_DEBUG") or os.environ.get("OPENAGENTIC_SDK_EXAMPLE_DEBUG") or ""
     return env.strip().lower() in ("1", "true", "yes", "y", "on") or ("--debug" in argv2)
 
 
