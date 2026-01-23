@@ -1,0 +1,23 @@
+from __future__ import annotations
+
+import asyncio
+from dataclasses import replace
+
+from _common import repo_root, rightcode_options
+
+from open_agent_sdk import run
+
+
+async def main() -> None:
+    options1 = rightcode_options(cwd=repo_root(), project_dir=repo_root(), allowed_tools=[])
+    r1 = await run(prompt="Say: RESUME_TURN_1_OK", options=options1)
+    print(f"turn1 session_id={r1.session_id} final_text={r1.final_text!r}")
+
+    options2 = rightcode_options(cwd=repo_root(), project_dir=repo_root(), allowed_tools=[])
+    options2 = replace(options2, resume=r1.session_id)
+    r2 = await run(prompt="Say: RESUME_TURN_2_OK (confirm you have prior context)", options=options2)
+    print(f"turn2 session_id={r2.session_id} final_text={r2.final_text!r}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

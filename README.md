@@ -10,6 +10,12 @@ Run unit tests:
 
 `PYTHONPATH=packages/sdk/open-agent-sdk python3 -m unittest discover -s packages/sdk/open-agent-sdk/tests -p 'test_*.py' -q`
 
+Run examples:
+
+- `python3 example/01_run_basic.py`
+- See `example/README.md` for the full list.
+  - Requires `RIGHTCODE_API_KEY` and network access (uses `OpenAICompatibleProvider`).
+
 ## Usage
 
 Streaming:
