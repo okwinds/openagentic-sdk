@@ -153,7 +153,7 @@ class AgentRuntime:
                 tool_names = [t for t in tool_names if t in allowed]
 
             tool_schemas: Sequence[Mapping[str, Any]] = ()
-            if getattr(options.provider, "name", None) == "openai":
+            if getattr(options.provider, "name", None) in ("openai", "openai-compatible"):
                 tool_schemas = tool_schemas_for_openai(tool_names)
 
             if getattr(self, "_base_system_prompt", None) and messages and messages[0].get("role") == "system":
