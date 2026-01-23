@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, AsyncIterator, Mapping, Sequence
 
-from .events import AssistantMessage, Result, SkillActivated, SystemInit, ToolResult, ToolUse, UserMessage
+from .events import AssistantDelta, AssistantMessage, Result, SkillActivated, SystemInit, ToolResult, ToolUse, UserMessage
 from .hooks.engine import HookEngine
 from .options import OpenAgentOptions
-from .providers.base import ToolCall
+from .providers.base import ModelOutput, ToolCall
 from .project.claude import load_claude_project_settings
 from .skills.index import index_skills
 from .sessions.rebuild import rebuild_messages
@@ -191,12 +191,45 @@ class AgentRuntime:
                 return
             messages = list(messages2)
 
-            model_out = await options.provider.complete(
-                model=options.model,
-                messages=messages,
-                tools=tool_schemas,
-                api_key=options.api_key,
-            )
+            model_out: ModelOutput
+            if hasattr(options.provider, "stream"):
+                parts: list[str] = []
+                tool_calls: list[ToolCall] = []
+                stream_fn = getattr(options.provider, "stream")
+                async for ev in stream_fn(model=options.model, messages=messages, tools=tool_schemas, api_key=options.api_key):
+                    ev_type = getattr(ev, "type", None)
+                    if ev_type is None and isinstance(ev, dict):
+                        ev_type = ev.get("type")
+                    if ev_type == "text_delta":
+                        delta = getattr(ev, "delta", None)
+                        if delta is None and isinstance(ev, dict):
+                            delta = ev.get("delta")
+                        if isinstance(delta, str) and delta:
+                            parts.append(delta)
+                            de = AssistantDelta(
+                                text_delta=delta,
+                                parent_tool_use_id=self._parent_tool_use_id,
+                                agent_name=self._agent_name,
+                            )
+                            store.append_event(session_id, de)
+                            yield de
+                    elif ev_type == "tool_call":
+                        tc = getattr(ev, "tool_call", None)
+                        if tc is None and isinstance(ev, dict):
+                            tc = ev.get("tool_call")
+                        if isinstance(tc, ToolCall):
+                            tool_calls.append(tc)
+                    elif ev_type == "done":
+                        break
+                assistant_text = "".join(parts) if parts else None
+                model_out = ModelOutput(assistant_text=assistant_text, tool_calls=tool_calls)
+            else:
+                model_out = await options.provider.complete(
+                    model=options.model,
+                    messages=messages,
+                    tools=tool_schemas,
+                    api_key=options.api_key,
+                )
             model_out2, hook_events2, decision2 = await options.hooks.run_after_model_call(
                 output=model_out, context=model_ctx
             )
