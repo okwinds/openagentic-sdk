@@ -15,7 +15,7 @@ def tool_schemas_for_openai(tool_names: Sequence[str], *, registry: ToolRegistry
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "questions": {"type": "array"},
+                        "questions": {"type": "array", "items": {"type": "object"}},
                         "answers": {"type": "object"},
                     },
                     "required": ["questions"],
@@ -134,8 +134,8 @@ def tool_schemas_for_openai(tool_names: Sequence[str], *, registry: ToolRegistry
                     "properties": {
                         "query": {"type": "string"},
                         "max_results": {"type": "integer"},
-                        "allowed_domains": {"type": "array"},
-                        "blocked_domains": {"type": "array"},
+                        "allowed_domains": {"type": "array", "items": {"type": "string"}},
+                        "blocked_domains": {"type": "array", "items": {"type": "string"}},
                     },
                     "required": ["query"],
                 },

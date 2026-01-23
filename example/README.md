@@ -60,7 +60,7 @@ Notes:
 
 Web (requires network):
 - `example/21_web_fetch_summarize.py` — `WebFetch` + in-tool summarization prompt
-- `example/22_web_search_then_fetch_report.py` — `WebSearch` → `WebFetch` → `Write` report (`TAVILY_API_KEY` required)
+- `example/22_web_search_then_fetch_report.py` — `WebSearch` → `WebFetch` → `Write` report (`TAVILY_API_KEY` required); writes to `.open-agent-sdk/example-artifacts/22/report.md`
 - `example/23_web_search_domain_filters.py` — `WebSearch` domain allowlist (`TAVILY_API_KEY` required)
 - `example/33_web_fetch_json_extract.py` — `WebFetch` JSON endpoint + extraction prompt
 - `example/34_web_fetch_compare_and_write.py` — fetch 2 pages and write comparison
