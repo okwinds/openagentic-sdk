@@ -17,7 +17,7 @@ class TestMainHelp(unittest.TestCase):
             env=env,
         )
         self.assertEqual(proc.returncode, 0)
-        self.assertIn("openagentic-sdk", (proc.stdout + proc.stderr).lower())
+        self.assertIn("openagentic", (proc.stdout + proc.stderr).lower())
 
 
 if __name__ == "__main__":

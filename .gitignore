@@ -22,4 +22,5 @@ dist/
 coverage.xml
 
 # Sessions
+.openagentic
 .openagentic-sdk

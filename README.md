@@ -61,7 +61,7 @@ Commands:
 - `oa resume <session_id>` (alias of `oa chat --resume <session_id>`)
 - `oa logs <session_id>` (summarize `events.jsonl`)
 
-Sessions are stored under `~/.openagentic-sdk` by default (override with `OPENAGENTIC_SDK_HOME`).
+Sessions are stored under `~/.openagentic` by default (override with `OPENAGENTIC_HOME`; legacy env: `OPENAGENTIC_SDK_HOME`).
 
 ## Publishing
 

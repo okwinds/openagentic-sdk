@@ -57,7 +57,11 @@ class BashTool(Tool):
         full_output_file_path: str | None = None
         if (stdout_truncated or stderr_truncated or output_lines_truncated) and ctx.project_dir:
             try:
-                out_dir = Path(ctx.project_dir) / ".openagentic-sdk" / "tool-output"
+                project_dir = Path(ctx.project_dir)
+                new_root = project_dir / ".openagentic"
+                legacy_root = project_dir / ".openagentic-sdk"
+                root = new_root if new_root.exists() or not legacy_root.exists() else legacy_root
+                out_dir = root / "tool-output"
                 out_dir.mkdir(parents=True, exist_ok=True)
                 out_path = out_dir / f"bash.{uuid.uuid4().hex}.txt"
                 out_path.write_bytes(stdout_full + stderr_full)

@@ -53,7 +53,7 @@
 - `oa resume <session_id>`（等价于 `oa chat --resume <session_id>`）
 - `oa logs <session_id>`（汇总 `events.jsonl`）
 
-默认会话目录为 `~/.openagentic-sdk`（可用 `OPENAGENTIC_SDK_HOME` 覆盖）。
+默认会话目录为 `~/.openagentic`（可用 `OPENAGENTIC_HOME` 覆盖；兼容旧环境变量 `OPENAGENTIC_SDK_HOME`）。
 
 示例默认需要环境变量（至少要有 `RIGHTCODE_API_KEY`）。在 PowerShell 下可以这样检查：
 
