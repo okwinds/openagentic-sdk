@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import re
-import shutil
 import sys
 from dataclasses import replace
 from typing import TextIO
@@ -73,13 +72,9 @@ async def run_chat(
     while True:
         prompt = "oa> "
         if enable_color:
-            cols = int(shutil.get_terminal_size(fallback=(80, 24)).columns)
-            styled_prompt = f"{ANSI_BG_GRAY}{ANSI_FG_GREEN}{prompt}{ANSI_FG_DEFAULT}"
-            fill = " " * max(0, cols - len(prompt))
-            if fill:
-                stdout.write(styled_prompt + fill + "\r" + styled_prompt)
-            else:
-                stdout.write(styled_prompt)
+            stdout.write(ANSI_RESET)
+            styled_prompt = f"{ANSI_BG_GRAY}\x1b[2K\r{ANSI_FG_GREEN}{prompt}{ANSI_FG_DEFAULT}"
+            stdout.write(styled_prompt)
             stdout.flush()
         else:
             stdout.write(prompt)
@@ -93,7 +88,10 @@ async def run_chat(
                 stdout.flush()
             continue
         if enable_color:
-            stdout.write(ANSI_RESET)
+            # The newline after Enter is echoed by the terminal while the input
+            # background is active, so the next line can inherit that background.
+            # Reset and clear the current line so model output has no background.
+            stdout.write(ANSI_RESET + "\x1b[2K")
             stdout.flush()
         if line == "":
             if enable_color:
