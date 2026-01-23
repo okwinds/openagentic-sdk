@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
-from open_agent_sdk.skills.index import index_skills
-from open_agent_sdk.tool_prompts import render_tool_prompt
+from openagentic_sdk.skills.index import index_skills
+from openagentic_sdk.tool_prompts import render_tool_prompt
 
 from .registry import ToolRegistry
 

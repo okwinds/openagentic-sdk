@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** 在 10 小时内，把 `packages/sdk/open-agent-sdk/` 从“能跑的原型”推进到 **可安装（pip -e）**、**强工具能力**、**skills 体系可用**、**hooks/permissions 完整可审计**、**sessions 可 resume**、**OpenAI 优先且支持 streaming**、并具备“多 Provider 扩展骨架”的 v0.1。
+**Goal:** 在 10 小时内，把 `packages/sdk/openagentic-sdk/` 从“能跑的原型”推进到 **可安装（pip -e）**、**强工具能力**、**skills 体系可用**、**hooks/permissions 完整可审计**、**sessions 可 resume**、**OpenAI 优先且支持 streaming**、并具备“多 Provider 扩展骨架”的 v0.1。
 
 **Architecture:** 保持分层：`api(query/run)` → `runtime(agent loop)` → `providers` → `tools` → `permissions` → `hooks` → `sessions` → `project(.claude)`；并引入 `skills` 子系统：`.claude/skills/**/SKILL.md` 的索引、加载、激活（active skill）与测试套件（离线、可复现）。
 
@@ -35,7 +35,7 @@
 
 Run（worktree 根目录）：
 
-`PYTHONPATH=packages/sdk/open-agent-sdk python3 -m unittest discover -s packages/sdk/open-agent-sdk/tests -p 'test_*.py' -q`
+`PYTHONPATH=packages/sdk/openagentic-sdk python3 -m unittest discover -s packages/sdk/openagentic-sdk/tests -p 'test_*.py' -q`
 
 Expected：PASS
 
@@ -43,8 +43,8 @@ Expected：PASS
 
 Run（worktree 根目录）：
 
-1) `python3 -m pip install -e packages/sdk/open-agent-sdk`
-2) `python3 -m unittest discover -s packages/sdk/open-agent-sdk/tests -p 'test_*.py' -q`
+1) `python3 -m pip install -e packages/sdk/openagentic-sdk`
+2) `python3 -m unittest discover -s packages/sdk/openagentic-sdk/tests -p 'test_*.py' -q`
 
 Expected：PASS（无需 PYTHONPATH）
 
@@ -88,12 +88,12 @@ Expected：PASS（无需 PYTHONPATH）
 ## Task 1.1：让包能被 pip -e 安装（不靠 PYTHONPATH）
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/pyproject.toml`
-- Create: `packages/sdk/open-agent-sdk/tests/test_install_import.py`
+- Modify: `packages/sdk/openagentic-sdk/pyproject.toml`
+- Create: `packages/sdk/openagentic-sdk/tests/test_install_import.py`
 
 **Step 1: 写 failing test（在“未安装”时预期会失败）**
 
-`packages/sdk/open-agent-sdk/tests/test_install_import.py`
+`packages/sdk/openagentic-sdk/tests/test_install_import.py`
 
 ```py
 import unittest
@@ -101,7 +101,7 @@ import unittest
 
 class TestInstallImport(unittest.TestCase):
     def test_import_open_agent_sdk(self) -> None:
-        import open_agent_sdk  # noqa: F401
+        import openagentic_sdk  # noqa: F401
 
 
 if __name__ == "__main__":
@@ -110,15 +110,15 @@ if __name__ == "__main__":
 
 **Step 2: 运行，确认当前失败**
 
-Workdir: `packages/sdk/open-agent-sdk`
+Workdir: `packages/sdk/openagentic-sdk`
 Run: `python3 -m unittest -q tests/test_install_import.py`
-Expected: FAIL with `ModuleNotFoundError: No module named 'open_agent_sdk'`
+Expected: FAIL with `ModuleNotFoundError: No module named 'openagentic_sdk'`
 
 **Step 3: 修改 packaging 配置（最小可行）**
 
-目标：让 setuptools 能发现包 `open_agent_sdk`。
+目标：让 setuptools 能发现包 `openagentic_sdk`。
 
-在 `packages/sdk/open-agent-sdk/pyproject.toml` 添加（示例）：
+在 `packages/sdk/openagentic-sdk/pyproject.toml` 添加（示例）：
 
 ```toml
 [tool.setuptools]
@@ -126,23 +126,23 @@ package-dir = {"" = "."}
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["open_agent_sdk*"]
+include = ["openagentic_sdk*"]
 ```
 
 **Step 4: 安装并验证 test 通过**
 
 Workdir: repo root
-Run: `python3 -m pip install -e packages/sdk/open-agent-sdk`
+Run: `python3 -m pip install -e packages/sdk/openagentic-sdk`
 Expected: 安装成功
 
-Run: `python3 -m unittest discover -s packages/sdk/open-agent-sdk/tests -p 'test_*.py' -q`
+Run: `python3 -m unittest discover -s packages/sdk/openagentic-sdk/tests -p 'test_*.py' -q`
 Expected: PASS
 
 **Step 5: Commit（可选）**
 
 ```bash
-git add packages/sdk/open-agent-sdk/pyproject.toml packages/sdk/open-agent-sdk/tests/test_install_import.py
-git commit -m "feat(open-agent-sdk): support editable install"
+git add packages/sdk/openagentic-sdk/pyproject.toml packages/sdk/openagentic-sdk/tests/test_install_import.py
+git commit -m "feat(openagentic-sdk): support editable install"
 ```
 
 ---
@@ -150,23 +150,23 @@ git commit -m "feat(open-agent-sdk): support editable install"
 ## Task 1.2：让 `python -m unittest` 在包目录内也能跑
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/tests/test_imports.py`
-- Create: `packages/sdk/open-agent-sdk/tests/__init__.py`
+- Modify: `packages/sdk/openagentic-sdk/tests/test_imports.py`
+- Create: `packages/sdk/openagentic-sdk/tests/__init__.py`
 
 **Step 1: failing test**
 
-在 `packages/sdk/open-agent-sdk` 目录执行：
+在 `packages/sdk/openagentic-sdk` 目录执行：
 Run: `python3 -m unittest -q`
 Expected: 目前可能出现“发现不到 tests”或 import 路径问题
 
 **Step 2: 实现**
 
-- 添加 `packages/sdk/open-agent-sdk/tests/__init__.py`（空文件即可）
-- 确保 `unittest discover` 能在 `packages/sdk/open-agent-sdk/tests` 找到全部 tests
+- 添加 `packages/sdk/openagentic-sdk/tests/__init__.py`（空文件即可）
+- 确保 `unittest discover` 能在 `packages/sdk/openagentic-sdk/tests` 找到全部 tests
 
 **Step 3: 验证**
 
-Workdir: `packages/sdk/open-agent-sdk`
+Workdir: `packages/sdk/openagentic-sdk`
 Run: `python3 -m unittest discover -s tests -p 'test_*.py' -q`
 Expected: PASS
 
@@ -175,12 +175,12 @@ Expected: PASS
 ## Task 1.3：增加 `__main__`（CLI smoke，离线）
 
 **Files:**
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/__main__.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_main_help.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/__main__.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_main_help.py`
 
 **Step 1: failing test**
 
-`packages/sdk/open-agent-sdk/tests/test_main_help.py`
+`packages/sdk/openagentic-sdk/tests/test_main_help.py`
 
 ```py
 import subprocess
@@ -191,12 +191,12 @@ import unittest
 class TestMainHelp(unittest.TestCase):
     def test_help(self) -> None:
         proc = subprocess.run(
-            [sys.executable, "-m", "open_agent_sdk", "--help"],
+            [sys.executable, "-m", "openagentic_sdk", "--help"],
             capture_output=True,
             text=True,
         )
         self.assertEqual(proc.returncode, 0)
-        self.assertIn("open-agent-sdk", (proc.stdout + proc.stderr).lower())
+        self.assertIn("openagentic-sdk", (proc.stdout + proc.stderr).lower())
 
 
 if __name__ == "__main__":
@@ -206,18 +206,18 @@ if __name__ == "__main__":
 **Step 2: run & fail**
 
 Workdir: repo root
-Run: `python3 -m unittest -q packages/sdk/open-agent-sdk/tests/test_main_help.py`
+Run: `python3 -m unittest -q packages/sdk/openagentic-sdk/tests/test_main_help.py`
 Expected: FAIL（模块不存在）
 
 **Step 3: minimal impl**
 
-`packages/sdk/open-agent-sdk/open_agent_sdk/__main__.py`
+`packages/sdk/openagentic-sdk/openagentic_sdk/__main__.py`
 
 ```py
 import argparse
 
 def main() -> int:
-    p = argparse.ArgumentParser(prog="open-agent-sdk")
+    p = argparse.ArgumentParser(prog="openagentic-sdk")
     p.add_argument("--help", action="help", help="show help")
     return 0
 
@@ -227,7 +227,7 @@ if __name__ == "__main__":
 
 **Step 4: run & pass**
 
-Run: `python3 -m unittest -q packages/sdk/open-agent-sdk/tests/test_main_help.py`
+Run: `python3 -m unittest -q packages/sdk/openagentic-sdk/tests/test_main_help.py`
 Expected: PASS
 
 ---
@@ -237,17 +237,17 @@ Expected: PASS
 ## Task 2.1：新增 errors 模块 + UnknownEventTypeError
 
 **Files:**
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/errors.py`
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/serialization.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_unknown_event_type.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/errors.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/serialization.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_unknown_event_type.py`
 
 **Step 1: failing test**
 
 ```py
 import unittest
 
-from open_agent_sdk.serialization import loads_event
-from open_agent_sdk.errors import UnknownEventTypeError
+from openagentic_sdk.serialization import loads_event
+from openagentic_sdk.errors import UnknownEventTypeError
 
 
 class TestUnknownEventType(unittest.TestCase):
@@ -262,7 +262,7 @@ if __name__ == "__main__":
 
 **Step 2: run & fail**
 
-Run: `python3 -m unittest -q packages/sdk/open-agent-sdk/tests/test_unknown_event_type.py`
+Run: `python3 -m unittest -q packages/sdk/openagentic-sdk/tests/test_unknown_event_type.py`
 Expected: FAIL（没有 UnknownEventTypeError）
 
 **Step 3: minimal impl**
@@ -280,14 +280,14 @@ Expected: FAIL（没有 UnknownEventTypeError）
 ## Task 2.2：为所有 events 增加 `ts` 与 `seq`（可审计）
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/events.py`
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/sessions/store.py`
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/runtime.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_event_seq_ts.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/events.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/sessions/store.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/runtime.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_event_seq_ts.py`
 
 **Step 1: failing test（写入 session 后检查 jsonl）**
 
-`packages/sdk/open-agent-sdk/tests/test_event_seq_ts.py`
+`packages/sdk/openagentic-sdk/tests/test_event_seq_ts.py`
 
 ```py
 import json
@@ -295,8 +295,8 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.events import SystemInit
-from open_agent_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.events import SystemInit
+from openagentic_sdk.sessions.store import FileSessionStore
 
 
 class TestEventSeqTs(unittest.TestCase):
@@ -331,7 +331,7 @@ if __name__ == "__main__":
 
 **Step 2: run & fail**
 
-Run: `python3 -m unittest -q packages/sdk/open-agent-sdk/tests/test_event_seq_ts.py`
+Run: `python3 -m unittest -q packages/sdk/openagentic-sdk/tests/test_event_seq_ts.py`
 Expected: FAIL（当前 events 没有 seq/ts）
 
 **Step 3: minimal impl（最小变更策略）**
@@ -363,7 +363,7 @@ Expected: FAIL（当前 events 没有 seq/ts）
 
 **Step 4: run & pass**
 
-Run: `python3 -m unittest -q packages/sdk/open-agent-sdk/tests/test_event_seq_ts.py`
+Run: `python3 -m unittest -q packages/sdk/openagentic-sdk/tests/test_event_seq_ts.py`
 Expected: PASS
 
 ---
@@ -371,19 +371,19 @@ Expected: PASS
 ## Task 2.3：新增 `UserMessage` 事件（为 resume 重建 messages 铺路）
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/events.py`
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/runtime.py`
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/serialization.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_user_message_event.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/events.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/runtime.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/serialization.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_user_message_event.py`
 
 **Step 1: failing test**
 
-`packages/sdk/open-agent-sdk/tests/test_user_message_event.py`
+`packages/sdk/openagentic-sdk/tests/test_user_message_event.py`
 
 ```py
 import unittest
-from open_agent_sdk.events import UserMessage
-from open_agent_sdk.serialization import dumps_event, loads_event
+from openagentic_sdk.events import UserMessage
+from openagentic_sdk.serialization import dumps_event, loads_event
 
 
 class TestUserMessageEvent(unittest.TestCase):
@@ -400,7 +400,7 @@ if __name__ == "__main__":
 
 **Step 2: run & fail**
 
-Run: `python3 -m unittest -q packages/sdk/open-agent-sdk/tests/test_user_message_event.py`
+Run: `python3 -m unittest -q packages/sdk/openagentic-sdk/tests/test_user_message_event.py`
 Expected: FAIL（无 UserMessage）
 
 **Step 3: minimal impl**
@@ -417,8 +417,8 @@ Expected: FAIL（无 UserMessage）
 ## Task 2.4：明确事件兼容策略（文档 + 1 个 contract test）
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/README.md`
-- Create: `packages/sdk/open-agent-sdk/tests/test_event_backward_compat.py`
+- Modify: `packages/sdk/openagentic-sdk/README.md`
+- Create: `packages/sdk/openagentic-sdk/tests/test_event_backward_compat.py`
 
 **Step 1: failing test**
 
@@ -447,26 +447,26 @@ raw = '{"type":"assistant.message","text":"x","new_field":123}'
 ## Task 5.1：新增 hook points：SessionStart/SessionEnd/BeforeModelCall/AfterModelCall/Stop
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/hooks/models.py`
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/hooks/engine.py`
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/runtime.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_hooks_model_points.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/hooks/models.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/hooks/engine.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/runtime.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_hooks_model_points.py`
 
 **Step 1: failing test（完整代码）**
 
-`packages/sdk/open-agent-sdk/tests/test_hooks_model_points.py`
+`packages/sdk/openagentic-sdk/tests/test_hooks_model_points.py`
 
 ```py
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.hooks.engine import HookEngine
-from open_agent_sdk.hooks.models import HookDecision, HookMatcher
-from open_agent_sdk.options import OpenAgentOptions
-from open_agent_sdk.permissions.gate import PermissionGate
-from open_agent_sdk.providers.base import ModelOutput
-from open_agent_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.hooks.engine import HookEngine
+from openagentic_sdk.hooks.models import HookDecision, HookMatcher
+from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.providers.base import ModelOutput
+from openagentic_sdk.sessions.store import FileSessionStore
 
 
 class NoopProvider:
@@ -497,10 +497,10 @@ class TestHooksModelPoints(unittest.IsolatedAsyncioTestCase):
                 session_store=store,
                 hooks=hooks,
             )
-            import open_agent_sdk
+            import openagentic_sdk
 
             events = []
-            async for e in open_agent_sdk.query(prompt="hi", options=options):
+            async for e in openagentic_sdk.query(prompt="hi", options=options):
                 events.append(e)
                 if getattr(e, "type", None) == "result":
                     break
@@ -555,19 +555,19 @@ Expected: FAIL（HookEngine 没有 before_model_call）
 ## Task 5.2：message rewrite hooks 默认关闭（显式开启）
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/hooks/engine.py`
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/options.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_hooks_message_rewrite_flag.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/hooks/engine.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/options.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_hooks_message_rewrite_flag.py`
 
 **Step 1: failing test**
 
-`packages/sdk/open-agent-sdk/tests/test_hooks_message_rewrite_flag.py`
+`packages/sdk/openagentic-sdk/tests/test_hooks_message_rewrite_flag.py`
 
 ```py
 import unittest
 
-from open_agent_sdk.hooks.engine import HookEngine
-from open_agent_sdk.hooks.models import HookDecision, HookMatcher
+from openagentic_sdk.hooks.engine import HookEngine
+from openagentic_sdk.hooks.models import HookDecision, HookMatcher
 
 
 class TestMessageRewriteFlag(unittest.IsolatedAsyncioTestCase):
@@ -603,16 +603,16 @@ Expected: FAIL（run_before_model_call 不存在/flag 不生效）
 ## Task 5.3：HookMatcher 支持 `Edit|Write` OR 语法（skills 常用）
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/hooks/engine.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_hook_matcher_or.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/hooks/engine.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_hook_matcher_or.py`
 
 **Step 1: failing test**
 
-`packages/sdk/open-agent-sdk/tests/test_hook_matcher_or.py`
+`packages/sdk/openagentic-sdk/tests/test_hook_matcher_or.py`
 
 ```py
 import unittest
-from open_agent_sdk.hooks.engine import _match_name
+from openagentic_sdk.hooks.engine import _match_name
 
 
 class TestHookMatcherOr(unittest.TestCase):
@@ -645,12 +645,12 @@ Expected: FAIL（_match_name 不存在）
 ## Task 6.1：Write 原子写 + overwrite 语义测试
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/write.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_write_overwrite_and_atomic.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/write.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_write_overwrite_and_atomic.py`
 
 **Step 1: failing test**
 
-`packages/sdk/open-agent-sdk/tests/test_write_overwrite_and_atomic.py`
+`packages/sdk/openagentic-sdk/tests/test_write_overwrite_and_atomic.py`
 
 ```py
 import os
@@ -658,8 +658,8 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.tools.base import ToolContext
-from open_agent_sdk.tools.write import WriteTool
+from openagentic_sdk.tools.base import ToolContext
+from openagentic_sdk.tools.write import WriteTool
 
 
 class TestWriteTool(unittest.TestCase):
@@ -705,20 +705,20 @@ Expected: FAIL（当前 Write 可能不是原子写/不清理 tmp）
 ## Task 6.2：Edit 增强：count=0 replace all + replacements 精确
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/edit.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_edit_replacements_count0.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/edit.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_edit_replacements_count0.py`
 
 **Step 1: failing test**
 
-`packages/sdk/open-agent-sdk/tests/test_edit_replacements_count0.py`
+`packages/sdk/openagentic-sdk/tests/test_edit_replacements_count0.py`
 
 ```py
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.tools.base import ToolContext
-from open_agent_sdk.tools.edit import EditTool
+from openagentic_sdk.tools.base import ToolContext
+from openagentic_sdk.tools.edit import EditTool
 
 
 class TestEditCountZero(unittest.TestCase):
@@ -755,20 +755,20 @@ Expected: FAIL（当前 replacements 统计可能不准 / count=0 语义不明�
 ## Task 6.3：Edit 增强：上下文锚点（before/after）防误替换
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/edit.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_edit_with_context_anchors.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/edit.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_edit_with_context_anchors.py`
 
 **Step 1: failing test**
 
-`packages/sdk/open-agent-sdk/tests/test_edit_with_context_anchors.py`
+`packages/sdk/openagentic-sdk/tests/test_edit_with_context_anchors.py`
 
 ```py
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.tools.base import ToolContext
-from open_agent_sdk.tools.edit import EditTool
+from openagentic_sdk.tools.base import ToolContext
+from openagentic_sdk.tools.edit import EditTool
 
 
 class TestEditAnchors(unittest.TestCase):
@@ -825,20 +825,20 @@ Expected: FAIL（EditTool 不支持 before/after）
 ## Task 6.4：Bash 输出截断标记（stdout_truncated/stderr_truncated）
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/bash.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_bash_truncation_flags.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/bash.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_bash_truncation_flags.py`
 
 **Step 1: failing test**
 
-`packages/sdk/open-agent-sdk/tests/test_bash_truncation_flags.py`
+`packages/sdk/openagentic-sdk/tests/test_bash_truncation_flags.py`
 
 ```py
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.tools.base import ToolContext
-from open_agent_sdk.tools.bash import BashTool
+from openagentic_sdk.tools.base import ToolContext
+from openagentic_sdk.tools.bash import BashTool
 
 
 class TestBashTruncation(unittest.TestCase):
@@ -873,18 +873,18 @@ Expected: FAIL（当前 BashTool 不返回 truncation flags）
 ## Task 6.5：WebFetch SSRF 基本防护测试（localhost/private 默认拒绝）
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/web_fetch.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_web_fetch_ssrf_block.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/web_fetch.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_web_fetch_ssrf_block.py`
 
 **Step 1: failing test**
 
-`packages/sdk/open-agent-sdk/tests/test_web_fetch_ssrf_block.py`
+`packages/sdk/openagentic-sdk/tests/test_web_fetch_ssrf_block.py`
 
 ```py
 import unittest
 
-from open_agent_sdk.tools.base import ToolContext
-from open_agent_sdk.tools.web_fetch import WebFetchTool
+from openagentic_sdk.tools.base import ToolContext
+from openagentic_sdk.tools.web_fetch import WebFetchTool
 
 
 class TestWebFetchSSRF(unittest.TestCase):
@@ -920,19 +920,19 @@ Expected: FAIL（如果工具当前没严格拦截 localhost/ip）
 ## Task 6.6：WebSearch Tavily 输出结构稳定 + 缺 key 处理
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/web_search_tavily.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_web_search_output_shape.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/web_search_tavily.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_web_search_output_shape.py`
 
 **Step 1: failing test**
 
-`packages/sdk/open-agent-sdk/tests/test_web_search_output_shape.py`
+`packages/sdk/openagentic-sdk/tests/test_web_search_output_shape.py`
 
 ```py
 import os
 import unittest
 
-from open_agent_sdk.tools.base import ToolContext
-from open_agent_sdk.tools.web_search_tavily import WebSearchTool
+from openagentic_sdk.tools.base import ToolContext
+from openagentic_sdk.tools.web_search_tavily import WebSearchTool
 
 
 class TestWebSearchShape(unittest.TestCase):
@@ -972,18 +972,18 @@ Expected: FAIL（如果 keys 不一致）
 ## Task 7.1：为 OpenAIProvider 增加 `stream(...)`（离线可测）
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/providers/openai.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/providers/sse.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_openai_sse_parser.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/providers/openai.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/providers/sse.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_openai_sse_parser.py`
 
 **Step 1: failing test（SSE parser）**
 
-`packages/sdk/open-agent-sdk/tests/test_openai_sse_parser.py`
+`packages/sdk/openagentic-sdk/tests/test_openai_sse_parser.py`
 
 ```py
 import unittest
 
-from open_agent_sdk.providers.sse import parse_sse_events
+from openagentic_sdk.providers.sse import parse_sse_events
 
 
 class TestSSEParser(unittest.TestCase):
@@ -1016,17 +1016,17 @@ Expected: FAIL（无 sse.py）
 ## Task 7.2：OpenAI tool-call streaming 组装器（arguments 分段拼接）
 
 **Files:**
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/providers/openai_stream_assembler.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_openai_tool_call_assembler.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/providers/openai_stream_assembler.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_openai_tool_call_assembler.py`
 
 **Step 1: failing test**
 
-`packages/sdk/open-agent-sdk/tests/test_openai_tool_call_assembler.py`
+`packages/sdk/openagentic-sdk/tests/test_openai_tool_call_assembler.py`
 
 ```py
 import unittest
 
-from open_agent_sdk.providers.openai_stream_assembler import ToolCallAssembler
+from openagentic_sdk.providers.openai_stream_assembler import ToolCallAssembler
 
 
 class TestToolCallAssembler(unittest.TestCase):
@@ -1066,8 +1066,8 @@ Expected: FAIL（assembler 不存在）
 ## Task 7.3：OpenAIProvider.stream（通过注入 transport 模拟）
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/providers/openai.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_openai_provider_stream.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/providers/openai.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_openai_provider_stream.py`
 
 **Step 1: failing test（不走网络）**
 
@@ -1077,12 +1077,12 @@ Expected: FAIL（assembler 不存在）
   - text deltas（list[str]）
   - assembled tool calls（list[ToolCall]）
 
-`packages/sdk/open-agent-sdk/tests/test_openai_provider_stream.py`
+`packages/sdk/openagentic-sdk/tests/test_openai_provider_stream.py`
 
 ```py
 import unittest
 
-from open_agent_sdk.providers.openai import OpenAIProvider
+from openagentic_sdk.providers.openai import OpenAIProvider
 
 
 def _sse(*payloads: str) -> list[bytes]:
@@ -1130,7 +1130,7 @@ if __name__ == "__main__":
     unittest.main()
 ```
 
-Run: `PYTHONPATH=packages/sdk/open-agent-sdk python3 -m unittest -q packages/sdk/open-agent-sdk/tests/test_openai_provider_stream.py`
+Run: `PYTHONPATH=packages/sdk/openagentic-sdk python3 -m unittest -q packages/sdk/openagentic-sdk/tests/test_openai_provider_stream.py`
 Expected: FAIL（当前 OpenAIProvider 无 stream/stream_transport）
 
 **Step 2: impl**
@@ -1148,18 +1148,18 @@ v0.1 推荐：真正 yield delta（因为你前面要求能力强）。
 ## Task 7.4：OpenAI-compatible 第二 Provider（同协议，base_url 可配置）
 
 **Files:**
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/providers/openai_compatible.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_openai_compatible_provider.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/providers/openai_compatible.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_openai_compatible_provider.py`
 
 **Step 1: failing test（header/base_url）**
 
-`packages/sdk/open-agent-sdk/tests/test_openai_compatible_provider.py`
+`packages/sdk/openagentic-sdk/tests/test_openai_compatible_provider.py`
 
 ```py
 import unittest
 
-from open_agent_sdk.providers.openai_compatible import OpenAICompatibleProvider
-from open_agent_sdk.providers.base import ModelOutput
+from openagentic_sdk.providers.openai_compatible import OpenAICompatibleProvider
+from openagentic_sdk.providers.base import ModelOutput
 
 
 class TestOpenAICompatibleProvider(unittest.IsolatedAsyncioTestCase):
@@ -1194,21 +1194,21 @@ if __name__ == "__main__":
 ## Task 8.1：runtime 支持 provider.stream → assistant.delta
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/runtime.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_runtime_streaming.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/runtime.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_runtime_streaming.py`
 
 **Step 1: failing test（FakeStreamingProvider）**
 
-`packages/sdk/open-agent-sdk/tests/test_runtime_streaming.py`
+`packages/sdk/openagentic-sdk/tests/test_runtime_streaming.py`
 
 ```py
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.options import OpenAgentOptions
-from open_agent_sdk.permissions.gate import PermissionGate
-from open_agent_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.sessions.store import FileSessionStore
 
 
 class FakeStreamingProvider:
@@ -1233,10 +1233,10 @@ class TestRuntimeStreaming(unittest.IsolatedAsyncioTestCase):
                 permission_gate=PermissionGate(permission_mode="bypass"),
                 session_store=store,
             )
-            import open_agent_sdk
+            import openagentic_sdk
 
             types = []
-            async for e in open_agent_sdk.query(prompt="hi", options=options):
+            async for e in openagentic_sdk.query(prompt="hi", options=options):
                 types.append(getattr(e, "type", None))
             self.assertIn("assistant.delta", types)
             self.assertIn("assistant.message", types)
@@ -1256,20 +1256,20 @@ if __name__ == "__main__":
 ## Task 9.1：实现 `skills` 模块（index + parser）
 
 **Files:**
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/skills/__init__.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/skills/index.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/skills/parse.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_skill_parser.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_skill_index.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/skills/__init__.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/skills/index.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/skills/parse.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_skill_parser.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_skill_index.py`
 
 **Step 1: failing test（parser，完整代码）**
 
-`packages/sdk/open-agent-sdk/tests/test_skill_parser.py`
+`packages/sdk/openagentic-sdk/tests/test_skill_parser.py`
 
 ```py
 import unittest
 
-from open_agent_sdk.skills.parse import parse_skill_markdown
+from openagentic_sdk.skills.parse import parse_skill_markdown
 
 
 SKILL_MD = \"\"\"# skill-example
@@ -1316,14 +1316,14 @@ Expected: FAIL（skills 模块不存在）
 
 **Step 5: failing test（index，完整代码）**
 
-`packages/sdk/open-agent-sdk/tests/test_skill_index.py`
+`packages/sdk/openagentic-sdk/tests/test_skill_index.py`
 
 ```py
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.skills.index import index_skills
+from openagentic_sdk.skills.index import index_skills
 
 
 class TestSkillIndex(unittest.TestCase):
@@ -1365,23 +1365,23 @@ Expected: FAIL（index_skills 不存在）
 ## Task 9.2：Skill 工具：SkillList / SkillLoad / SkillActivate
 
 **Files:**
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/skill_list.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/skill_load.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/skill_activate.py`
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/defaults.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_skill_tools.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/skill_list.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/skill_load.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/skill_activate.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/defaults.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_skill_tools.py`
 
 **Step 1: failing test（SkillLoad 输出结构稳定）**
 
-`packages/sdk/open-agent-sdk/tests/test_skill_tools.py`
+`packages/sdk/openagentic-sdk/tests/test_skill_tools.py`
 
 ```py
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.tools.base import ToolContext
-from open_agent_sdk.tools.skill_load import SkillLoadTool
+from openagentic_sdk.tools.base import ToolContext
+from openagentic_sdk.tools.skill_load import SkillLoadTool
 
 
 class TestSkillTools(unittest.TestCase):
@@ -1430,23 +1430,23 @@ Expected: FAIL（SkillLoadTool 不存在）
 ## Task 9.3：runtime 注入 skills index + active skills（system prompt）
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/runtime.py`
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/project/claude.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_runtime_skill_injection.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/runtime.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/project/claude.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_runtime_skill_injection.py`
 
 **Step 1: failing test（捕获 messages）**
 
-`packages/sdk/open-agent-sdk/tests/test_runtime_skill_injection.py`
+`packages/sdk/openagentic-sdk/tests/test_runtime_skill_injection.py`
 
 ```py
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.options import OpenAgentOptions
-from open_agent_sdk.permissions.gate import PermissionGate
-from open_agent_sdk.providers.base import ModelOutput
-from open_agent_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.providers.base import ModelOutput
+from openagentic_sdk.sessions.store import FileSessionStore
 
 
 class RecordingProvider:
@@ -1485,9 +1485,9 @@ class TestRuntimeSkillInjection(unittest.IsolatedAsyncioTestCase):
                 project_dir=str(root),
             )
 
-            import open_agent_sdk
+            import openagentic_sdk
 
-            async for _ in open_agent_sdk.query(prompt="hi", options=options):
+            async for _ in openagentic_sdk.query(prompt="hi", options=options):
                 pass
 
             first_call_msgs = provider.seen[0]
@@ -1502,7 +1502,7 @@ if __name__ == "__main__":
     unittest.main()
 ```
 
-Run: `PYTHONPATH=packages/sdk/open-agent-sdk python3 -m unittest -q packages/sdk/open-agent-sdk/tests/test_runtime_skill_injection.py`
+Run: `PYTHONPATH=packages/sdk/openagentic-sdk python3 -m unittest -q packages/sdk/openagentic-sdk/tests/test_runtime_skill_injection.py`
 Expected: FAIL（目前 runtime 未注入 `.claude` skills/memory 到 system message）
 
 ---
@@ -1512,12 +1512,12 @@ Expected: FAIL（目前 runtime 未注入 `.claude` skills/memory 到 system mes
 ## Task 10.1：新增 skills fixtures（3 套项目）
 
 **Files:**
-- Create: `packages/sdk/open-agent-sdk/tests/fixtures/claude_project_min/CLAUDE.md`
-- Create: `packages/sdk/open-agent-sdk/tests/fixtures/claude_project_min/.claude/skills/example/SKILL.md`
-- Create: `packages/sdk/open-agent-sdk/tests/fixtures/claude_project_min/.claude/commands/hello.md`
-- Create: `packages/sdk/open-agent-sdk/tests/fixtures/claude_project_checklist/.claude/skills/check/SKILL.md`
-- Create: `packages/sdk/open-agent-sdk/tests/fixtures/claude_project_nested/.claude/skills/a/SKILL.md`
-- Create: `packages/sdk/open-agent-sdk/tests/fixtures/claude_project_nested/.claude/skills/b/SKILL.md`
+- Create: `packages/sdk/openagentic-sdk/tests/fixtures/claude_project_min/CLAUDE.md`
+- Create: `packages/sdk/openagentic-sdk/tests/fixtures/claude_project_min/.claude/skills/example/SKILL.md`
+- Create: `packages/sdk/openagentic-sdk/tests/fixtures/claude_project_min/.claude/commands/hello.md`
+- Create: `packages/sdk/openagentic-sdk/tests/fixtures/claude_project_checklist/.claude/skills/check/SKILL.md`
+- Create: `packages/sdk/openagentic-sdk/tests/fixtures/claude_project_nested/.claude/skills/a/SKILL.md`
+- Create: `packages/sdk/openagentic-sdk/tests/fixtures/claude_project_nested/.claude/skills/b/SKILL.md`
 
 **Step 1: fixture 内容规范（建议模板）**
 
@@ -1541,7 +1541,7 @@ Use Read, Grep, Edit.
 ## Task 10.2：skills 端到端：FakeProvider 根据 skill checklist 触发工具调用
 
 **Files:**
-- Create: `packages/sdk/open-agent-sdk/tests/test_skill_e2e_tooling.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_skill_e2e_tooling.py`
 
 **Step 1: failing test（e2e）**
 
@@ -1562,17 +1562,17 @@ Use Read, Grep, Edit.
 - 出现 `tool.use`(Grep)→`tool.result`
 - 出现 `result`
 
-`packages/sdk/open-agent-sdk/tests/test_skill_e2e_tooling.py`
+`packages/sdk/openagentic-sdk/tests/test_skill_e2e_tooling.py`
 
 ```py
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.options import OpenAgentOptions
-from open_agent_sdk.permissions.gate import PermissionGate
-from open_agent_sdk.providers.base import ModelOutput, ToolCall
-from open_agent_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.providers.base import ModelOutput, ToolCall
+from openagentic_sdk.sessions.store import FileSessionStore
 
 
 class ScriptedProvider:
@@ -1615,10 +1615,10 @@ class TestSkillE2E(unittest.IsolatedAsyncioTestCase):
                 project_dir=str(root),
             )
 
-            import open_agent_sdk
+            import openagentic_sdk
 
             events = []
-            async for e in open_agent_sdk.query(prompt="run check", options=options):
+            async for e in openagentic_sdk.query(prompt="run check", options=options):
                 events.append(e)
 
             types = [getattr(e, "type", None) for e in events]
@@ -1641,7 +1641,7 @@ if __name__ == "__main__":
 ## Task 10.3：skills 回归测试矩阵（至少 12 个 case）
 
 **Files:**
-- Create: `packages/sdk/open-agent-sdk/tests/test_skill_matrix.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_skill_matrix.py`
 
 覆盖点建议（每个 case 一个 test_* 方法）：
 
@@ -1658,15 +1658,15 @@ if __name__ == "__main__":
 11) SkillActivate 重复激活：去重保持顺序
 12) hooks 能在 PreToolUse 拦截 SkillLoad 并改写 project_dir（测试 rewrite）
 
-`packages/sdk/open-agent-sdk/tests/test_skill_matrix.py`
+`packages/sdk/openagentic-sdk/tests/test_skill_matrix.py`
 
 ```py
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.skills.index import index_skills
-from open_agent_sdk.skills.parse import parse_skill_markdown
+from openagentic_sdk.skills.index import index_skills
+from openagentic_sdk.skills.parse import parse_skill_markdown
 
 
 class TestSkillMatrix(unittest.TestCase):
@@ -1715,18 +1715,18 @@ if __name__ == "__main__":
     unittest.main()
 ```
 
-Run: `PYTHONPATH=packages/sdk/open-agent-sdk python3 -m unittest -q packages/sdk/open-agent-sdk/tests/test_skill_matrix.py`
-Expected: FAIL until `open_agent_sdk.skills.*` is implemented and stable.
+Run: `PYTHONPATH=packages/sdk/openagentic-sdk python3 -m unittest -q packages/sdk/openagentic-sdk/tests/test_skill_matrix.py`
+Expected: FAIL until `openagentic_sdk.skills.*` is implemented and stable.
 
 ---
 
 ## Task 10.4：文档与 examples：让用户知道如何写技能与如何让 agent 用它
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/README.md`
-- Create: `packages/sdk/open-agent-sdk/examples/skills_index.py`
-- Create: `packages/sdk/open-agent-sdk/examples/skills_activate.py`
-- Create: `packages/sdk/open-agent-sdk/examples/skills_e2e_fake_provider.py`
+- Modify: `packages/sdk/openagentic-sdk/README.md`
+- Create: `packages/sdk/openagentic-sdk/examples/skills_index.py`
+- Create: `packages/sdk/openagentic-sdk/examples/skills_activate.py`
+- Create: `packages/sdk/openagentic-sdk/examples/skills_e2e_fake_provider.py`
 
 文档必须包含：
 - `.claude/skills/**/SKILL.md` 结构约定
@@ -1739,13 +1739,13 @@ Expected: FAIL until `open_agent_sdk.skills.*` is implemented and stable.
 ## Task 3.3：SessionStore 记录 meta：provider/model/options 摘要
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/runtime.py`
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/sessions/store.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_session_meta.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/runtime.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/sessions/store.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_session_meta.py`
 
 **Step 1: failing test**
 
-`packages/sdk/open-agent-sdk/tests/test_session_meta.py`
+`packages/sdk/openagentic-sdk/tests/test_session_meta.py`
 
 ```py
 import json
@@ -1753,10 +1753,10 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.options import OpenAgentOptions
-from open_agent_sdk.providers.base import ModelOutput
-from open_agent_sdk.permissions.gate import PermissionGate
-from open_agent_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.providers.base import ModelOutput
+from openagentic_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.sessions.store import FileSessionStore
 
 
 class NoopProvider:
@@ -1779,10 +1779,10 @@ class TestSessionMeta(unittest.IsolatedAsyncioTestCase):
                 permission_gate=PermissionGate(permission_mode="bypass"),
                 session_store=store,
             )
-            import open_agent_sdk
+            import openagentic_sdk
 
             events = []
-            async for e in open_agent_sdk.query(prompt="hi", options=options):
+            async for e in openagentic_sdk.query(prompt="hi", options=options):
                 events.append(e)
             sid = next(e.session_id for e in events if getattr(e, "type", None) == "system.init")
             meta = json.loads((root / "sessions" / sid / "meta.json").read_text(encoding="utf-8"))
@@ -1819,13 +1819,13 @@ Expected: FAIL（目前 meta 只写 cwd，没统一策略或字段不同）
 ## Task 3.4：SessionStore 支持“父子关系”落盘（subagent）
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/runtime.py`
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/sessions/store.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_session_parent_child_link.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/runtime.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/sessions/store.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_session_parent_child_link.py`
 
 **Step 1: failing test**
 
-`packages/sdk/open-agent-sdk/tests/test_session_parent_child_link.py`
+`packages/sdk/openagentic-sdk/tests/test_session_parent_child_link.py`
 
 ```py
 import json
@@ -1833,10 +1833,10 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.options import AgentDefinition, OpenAgentOptions
-from open_agent_sdk.permissions.gate import PermissionGate
-from open_agent_sdk.providers.base import ModelOutput, ToolCall
-from open_agent_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.options import AgentDefinition, OpenAgentOptions
+from openagentic_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.providers.base import ModelOutput, ToolCall
+from openagentic_sdk.sessions.store import FileSessionStore
 
 
 class TaskProvider:
@@ -1870,10 +1870,10 @@ class TestSessionLink(unittest.IsolatedAsyncioTestCase):
                 session_store=store,
                 agents={"worker": AgentDefinition(description="d", prompt="child", tools=())},
             )
-            import open_agent_sdk
+            import openagentic_sdk
 
             events = []
-            async for e in open_agent_sdk.query(prompt="parent", options=options):
+            async for e in openagentic_sdk.query(prompt="parent", options=options):
                 events.append(e)
             # tool.result for Task contains child_session_id
             tr = next(e for e in events if getattr(e, "type", None) == "tool.result" and getattr(e, "tool_use_id", None) == "t1")
@@ -1907,19 +1907,19 @@ Expected: FAIL（child meta 未记录 parent）
 ## Task 4.1：抽离 interactive 模块（注入 input_fn，unittest 可控）
 
 **Files:**
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/permissions/interactive.py`
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/permissions/gate.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_permissions_prompt.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/permissions/interactive.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/permissions/gate.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_permissions_prompt.py`
 
 **Step 1: failing test（完整代码）**
 
-`packages/sdk/open-agent-sdk/tests/test_permissions_prompt.py`
+`packages/sdk/openagentic-sdk/tests/test_permissions_prompt.py`
 
 ```py
 import unittest
 
-from open_agent_sdk.permissions.gate import PermissionGate
-from open_agent_sdk.permissions.interactive import InteractiveApprover
+from openagentic_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.permissions.interactive import InteractiveApprover
 
 
 class TestPermissionsPrompt(unittest.IsolatedAsyncioTestCase):
@@ -1974,25 +1974,25 @@ prompt 模式：
 ## Task 4.2：AskUserQuestion 事件模型（非交互 host）
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/events.py`
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/runtime.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_ask_user_question.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/events.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/runtime.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_ask_user_question.py`
 
 **Step 1: failing test**
 
 场景：`permission_mode="prompt"` 但 `interactive=False` 且 host 提供 `user_answerer` 回调。
 
-`packages/sdk/open-agent-sdk/tests/test_ask_user_question.py`
+`packages/sdk/openagentic-sdk/tests/test_ask_user_question.py`
 
 ```py
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.options import OpenAgentOptions
-from open_agent_sdk.permissions.gate import PermissionGate
-from open_agent_sdk.providers.base import ModelOutput, ToolCall
-from open_agent_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.providers.base import ModelOutput, ToolCall
+from openagentic_sdk.sessions.store import FileSessionStore
 
 
 class ProviderAsksTool:
@@ -2018,10 +2018,10 @@ class TestAskUserQuestion(unittest.IsolatedAsyncioTestCase):
                 session_store=store,
                 permission_gate=PermissionGate(permission_mode="prompt", interactive=False, user_answerer=answerer),
             )
-            import open_agent_sdk
+            import openagentic_sdk
 
             events = []
-            async for e in open_agent_sdk.query(prompt="go", options=options):
+            async for e in openagentic_sdk.query(prompt="go", options=options):
                 events.append(e)
                 if getattr(e, "type", None) == "tool.result":
                     break
@@ -2064,14 +2064,14 @@ Expected: FAIL（目前没有 user.question 事件，也没有 user_answerer）
 ## Task 3.1：实现 `SessionRebuilder`（events → messages）
 
 **Files:**
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/sessions/rebuild.py`
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/sessions/store.py`
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/runtime.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_resume_rebuild_messages.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/sessions/rebuild.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/sessions/store.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/runtime.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_resume_rebuild_messages.py`
 
 **Step 1: failing test（完整代码）**
 
-`packages/sdk/open-agent-sdk/tests/test_resume_rebuild_messages.py`
+`packages/sdk/openagentic-sdk/tests/test_resume_rebuild_messages.py`
 
 ```py
 import json
@@ -2079,10 +2079,10 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.options import OpenAgentOptions
-from open_agent_sdk.providers.base import ModelOutput, ToolCall
-from open_agent_sdk.permissions.gate import PermissionGate
-from open_agent_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.providers.base import ModelOutput, ToolCall
+from openagentic_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.sessions.store import FileSessionStore
 
 
 class FakeProvider:
@@ -2119,10 +2119,10 @@ class TestResumeRebuild(unittest.IsolatedAsyncioTestCase):
                 session_store=store,
             )
 
-            import open_agent_sdk
+            import openagentic_sdk
 
             events1 = []
-            async for e in open_agent_sdk.query(prompt="read it", options=options1):
+            async for e in openagentic_sdk.query(prompt="read it", options=options1):
                 events1.append(e)
             sid = next(e.session_id for e in events1 if getattr(e, "type", None) == "system.init")
 
@@ -2137,7 +2137,7 @@ class TestResumeRebuild(unittest.IsolatedAsyncioTestCase):
                 resume=sid,
             )
 
-            async for _ in open_agent_sdk.query(prompt="continue", options=options2):
+            async for _ in openagentic_sdk.query(prompt="continue", options=options2):
                 pass
 
             # provider2 first call should include rebuilt history (at least 1 tool message)
@@ -2152,7 +2152,7 @@ if __name__ == "__main__":
 
 **Step 2: run & fail**
 
-Run: `PYTHONPATH=packages/sdk/open-agent-sdk python3 -m unittest -q packages/sdk/open-agent-sdk/tests/test_resume_rebuild_messages.py`
+Run: `PYTHONPATH=packages/sdk/openagentic-sdk python3 -m unittest -q packages/sdk/openagentic-sdk/tests/test_resume_rebuild_messages.py`
 Expected: FAIL（当前 resume 不重建 messages）
 
 **Step 3: minimal impl**
@@ -2174,24 +2174,24 @@ Expected: FAIL（当前 resume 不重建 messages）
 ## Task 3.2：resume 截断（按 event 数量与字节数）
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/options.py`
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/sessions/rebuild.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_resume_limits.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/options.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/sessions/rebuild.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_resume_limits.py`
 
 **Step 1: failing test**
 
 构造 2000 条事件（可重复写入 `AssistantMessage`），设置 `resume_max_events=200`，验证 rebuild 后不超过 200 条 messages。
 
-`packages/sdk/open-agent-sdk/tests/test_resume_limits.py`
+`packages/sdk/openagentic-sdk/tests/test_resume_limits.py`
 
 ```py
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.events import AssistantMessage, SystemInit
-from open_agent_sdk.sessions.store import FileSessionStore
-from open_agent_sdk.sessions.rebuild import rebuild_messages
+from openagentic_sdk.events import AssistantMessage, SystemInit
+from openagentic_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.sessions.rebuild import rebuild_messages
 
 
 class TestResumeLimits(unittest.TestCase):

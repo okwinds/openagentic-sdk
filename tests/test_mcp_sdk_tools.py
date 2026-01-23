@@ -3,10 +3,10 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk import OpenAgentOptions, create_sdk_mcp_server, tool
-from open_agent_sdk.permissions.gate import PermissionGate
-from open_agent_sdk.providers.base import ModelOutput, ToolCall
-from open_agent_sdk.sessions.store import FileSessionStore
+from openagentic_sdk import OpenAgentOptions, create_sdk_mcp_server, tool
+from openagentic_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.providers.base import ModelOutput, ToolCall
+from openagentic_sdk.sessions.store import FileSessionStore
 
 
 @tool("add", "Add two numbers", {"a": float, "b": float})
@@ -57,9 +57,9 @@ class TestMcpSdkTools(unittest.IsolatedAsyncioTestCase):
                 allowed_tools=["mcp__calc__add"],
                 mcp_servers={"calc": server},
             )
-            import open_agent_sdk
+            import openagentic_sdk
 
-            r = await open_agent_sdk.run(prompt="hi", options=options)
+            r = await openagentic_sdk.run(prompt="hi", options=options)
             self.assertEqual(r.final_text, "sum=3.0")
 
 

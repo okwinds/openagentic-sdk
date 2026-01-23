@@ -11,14 +11,12 @@ from .message_query import query_messages
 from .messages import Message, ResultMessage
 from .options import OpenAgentOptions
 from .prompting import coerce_prompt
+from .paths import default_session_root
 from .sessions.store import FileSessionStore
 
 
 def _default_session_root() -> Path:
-    env = os.environ.get("OPEN_AGENT_SDK_HOME")
-    if env:
-        return Path(env).expanduser()
-    return Path.home() / ".open-agent-sdk"
+    return default_session_root()
 
 
 class OpenAgentSDKClient:

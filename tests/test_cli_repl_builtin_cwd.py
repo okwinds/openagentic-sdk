@@ -2,9 +2,9 @@ import asyncio
 import io
 import unittest
 
-from open_agent_sdk.options import OpenAgentOptions
-from open_agent_sdk.permissions.gate import PermissionGate
-from open_agent_sdk.providers.openai_compatible import OpenAICompatibleProvider
+from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.providers.openai_compatible import OpenAICompatibleProvider
 
 
 class _TtyStringIO(io.StringIO):
@@ -14,8 +14,8 @@ class _TtyStringIO(io.StringIO):
 
 class TestCliReplBuiltinCwd(unittest.TestCase):
     def test_cwd_question_is_answered_locally(self) -> None:
-        from open_agent_cli.repl import run_chat
-        from open_agent_cli.style import StyleConfig
+        from openagentic_cli.repl import run_chat
+        from openagentic_cli.style import StyleConfig
 
         opts = OpenAgentOptions(
             provider=OpenAICompatibleProvider(base_url="https://example.invalid"),

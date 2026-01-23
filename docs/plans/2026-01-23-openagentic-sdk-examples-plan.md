@@ -6,7 +6,7 @@
 
 **Architecture:** Create a tiny shared helper module (`example/_common.py`) for consistent sys.path setup, session root, and small provider stubs. Each example is deterministic/offline-first via scripted providers; a few examples optionally support real providers via env vars.
 
-**Tech Stack:** Python 3.11+, stdlib only, existing `open_agent_sdk` modules.
+**Tech Stack:** Python 3.11+, stdlib only, existing `openagentic_sdk` modules.
 
 ---
 
@@ -22,7 +22,7 @@
 - `StepStreamingProvider` for deterministic `stream()` sequences.
 
 **Step 3:** Add helpers to:
-- Build `OpenAgentOptions` with a default `.open-agent-sdk` session root under repo.
+- Build `OpenAgentOptions` with a default `.openagentic-sdk` session root under repo.
 - Parse tool outputs from provider-native `tool` messages.
 
 ---
@@ -71,7 +71,7 @@
 
 **Step 1:** `Task` example demonstrates parent/child event streaming and returns a `ToolResult` with `child_session_id` + `final_text`.
 
-**Step 2:** MCP example uses `open_agent_sdk.mcp.sdk.tool` + `create_sdk_mcp_server` and calls `mcp__<server>__<tool>`.
+**Step 2:** MCP example uses `openagentic_sdk.mcp.sdk.tool` + `create_sdk_mcp_server` and calls `mcp__<server>__<tool>`.
 
 **Step 3:** Session inspection example prints `meta.json` + tail of `events.jsonl` for a chosen session id.
 

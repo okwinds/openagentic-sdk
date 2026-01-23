@@ -5,10 +5,10 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from _common import rightcode_options
-from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled, console_query
-from open_agent_sdk import OpenAgentOptions
-from open_agent_sdk.events import UserQuestion
-from open_agent_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.console import ConsoleRenderer, console_debug_enabled, console_query
+from openagentic_sdk import OpenAgentOptions
+from openagentic_sdk.events import UserQuestion
+from openagentic_sdk.permissions.gate import PermissionGate
 
 
 async def _always_yes(question: UserQuestion) -> str:

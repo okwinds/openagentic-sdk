@@ -3,10 +3,10 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.options import OpenAgentOptions
-from open_agent_sdk.permissions.gate import PermissionGate
-from open_agent_sdk.providers.base import ModelOutput
-from open_agent_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.providers.base import ModelOutput
+from openagentic_sdk.sessions.store import FileSessionStore
 
 
 class NoopProvider:
@@ -29,10 +29,10 @@ class TestSessionMeta(unittest.IsolatedAsyncioTestCase):
                 permission_gate=PermissionGate(permission_mode="bypass"),
                 session_store=store,
             )
-            import open_agent_sdk
+            import openagentic_sdk
 
             events = []
-            async for e in open_agent_sdk.query(prompt="hi", options=options):
+            async for e in openagentic_sdk.query(prompt="hi", options=options):
                 events.append(e)
             sid = next(e.session_id for e in events if getattr(e, "type", None) == "system.init")
             meta = json.loads((root / "sessions" / sid / "meta.json").read_text(encoding="utf-8"))

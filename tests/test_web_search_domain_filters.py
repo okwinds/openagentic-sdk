@@ -1,8 +1,8 @@
 import os
 import unittest
 
-from open_agent_sdk.tools.base import ToolContext
-from open_agent_sdk.tools.web_search_tavily import WebSearchTool
+from openagentic_sdk.tools.base import ToolContext
+from openagentic_sdk.tools.web_search_tavily import WebSearchTool
 
 
 class TestWebSearchDomainFilters(unittest.TestCase):

@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.project.claude import load_claude_project_settings
+from openagentic_sdk.project.claude import load_claude_project_settings
 
 
 class TestClaudeProjectLoader(unittest.TestCase):

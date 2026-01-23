@@ -12,9 +12,9 @@
 
 ## Conventions
 
-- New package root: `packages/sdk/open-agent-sdk/`
-- Python module name: `open_agent_sdk`
-- Default session store dir: use `platformdirs.user_data_dir("open-agent-sdk")` (exact path differs by OS)
+- New package root: `packages/sdk/openagentic-sdk/`
+- Python module name: `openagentic_sdk`
+- Default session store dir: use `platformdirs.user_data_dir("openagentic-sdk")` (exact path differs by OS)
 - Tests are offline by default; all HTTP calls must be mocked.
 
 ---
@@ -22,30 +22,30 @@
 ### Task 1: Scaffold the Python package
 
 **Files:**
-- Create: `packages/sdk/open-agent-sdk/pyproject.toml`
-- Create: `packages/sdk/open-agent-sdk/README.md`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/__init__.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/_version.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_imports.py`
+- Create: `packages/sdk/openagentic-sdk/pyproject.toml`
+- Create: `packages/sdk/openagentic-sdk/README.md`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/__init__.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/_version.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_imports.py`
 
 **Step 1: Write the failing test**
 
-`packages/sdk/open-agent-sdk/tests/test_imports.py`
+`packages/sdk/openagentic-sdk/tests/test_imports.py`
 
 ```py
 def test_import_open_agent_sdk():
-    import open_agent_sdk  # noqa: F401
+    import openagentic_sdk  # noqa: F401
 ```
 
 **Step 2: Run test to verify it fails**
 
-Run: `uv run --project packages/sdk/open-agent-sdk pytest -q`
+Run: `uv run --project packages/sdk/openagentic-sdk pytest -q`
 
-Expected: FAIL with `ModuleNotFoundError: No module named 'open_agent_sdk'`
+Expected: FAIL with `ModuleNotFoundError: No module named 'openagentic_sdk'`
 
 **Step 3: Write minimal implementation**
 
-`packages/sdk/open-agent-sdk/open_agent_sdk/__init__.py`
+`packages/sdk/openagentic-sdk/openagentic_sdk/__init__.py`
 
 ```py
 from ._version import __version__
@@ -53,7 +53,7 @@ from ._version import __version__
 __all__ = ["__version__"]
 ```
 
-`packages/sdk/open-agent-sdk/open_agent_sdk/_version.py`
+`packages/sdk/openagentic-sdk/openagentic_sdk/_version.py`
 
 ```py
 __version__ = "0.0.0"
@@ -61,11 +61,11 @@ __version__ = "0.0.0"
 
 **Step 4: Add packaging metadata**
 
-`packages/sdk/open-agent-sdk/pyproject.toml` (minimal)
+`packages/sdk/openagentic-sdk/pyproject.toml` (minimal)
 
 ```toml
 [project]
-name = "open-agent-sdk"
+name = "openagentic-sdk"
 version = "0.0.0"
 requires-python = ">=3.11"
 dependencies = [
@@ -88,11 +88,11 @@ build-backend = "hatchling.build"
 
 **Step 5: Run test to verify it passes**
 
-Run: `uv sync --dev --project packages/sdk/open-agent-sdk`
+Run: `uv sync --dev --project packages/sdk/openagentic-sdk`
 
 Expected: installs deps successfully
 
-Run: `uv run --project packages/sdk/open-agent-sdk pytest -q`
+Run: `uv run --project packages/sdk/openagentic-sdk pytest -q`
 
 Expected: PASS (`1 passed`)
 
@@ -101,17 +101,17 @@ Expected: PASS (`1 passed`)
 ### Task 2: Define the event model + JSONL roundtrip
 
 **Files:**
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/events.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/serialization.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_events_roundtrip.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/events.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/serialization.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_events_roundtrip.py`
 
 **Step 1: Write the failing test**
 
-`packages/sdk/open-agent-sdk/tests/test_events_roundtrip.py`
+`packages/sdk/openagentic-sdk/tests/test_events_roundtrip.py`
 
 ```py
-from open_agent_sdk.events import SystemInit
-from open_agent_sdk.serialization import dumps_event, loads_event
+from openagentic_sdk.events import SystemInit
+from openagentic_sdk.serialization import dumps_event, loads_event
 
 def test_event_roundtrip():
     e1 = SystemInit(session_id="s1", cwd="/tmp", sdk_version="0.0.0")
@@ -122,13 +122,13 @@ def test_event_roundtrip():
 
 **Step 2: Run test to verify it fails**
 
-Run: `uv run --project packages/sdk/open-agent-sdk pytest -q tests/test_events_roundtrip.py::test_event_roundtrip`
+Run: `uv run --project packages/sdk/openagentic-sdk pytest -q tests/test_events_roundtrip.py::test_event_roundtrip`
 
 Expected: FAIL with import error or missing symbol
 
 **Step 3: Write minimal implementation**
 
-`packages/sdk/open-agent-sdk/open_agent_sdk/events.py`
+`packages/sdk/openagentic-sdk/openagentic_sdk/events.py`
 
 ```py
 from __future__ import annotations
@@ -148,7 +148,7 @@ class SystemInit(EventBase):
 Event = Union[SystemInit]
 ```
 
-`packages/sdk/open-agent-sdk/open_agent_sdk/serialization.py`
+`packages/sdk/openagentic-sdk/openagentic_sdk/serialization.py`
 
 ```py
 from __future__ import annotations
@@ -170,7 +170,7 @@ def loads_event(raw: str) -> Event:
 
 **Step 4: Run test to verify it passes**
 
-Run: `uv run --project packages/sdk/open-agent-sdk pytest -q tests/test_events_roundtrip.py::test_event_roundtrip`
+Run: `uv run --project packages/sdk/openagentic-sdk pytest -q tests/test_events_roundtrip.py::test_event_roundtrip`
 
 Expected: PASS
 
@@ -179,17 +179,17 @@ Expected: PASS
 ### Task 3: Implement filesystem session store (events.jsonl)
 
 **Files:**
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/sessions/store.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/sessions/paths.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_session_store.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/sessions/store.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/sessions/paths.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_session_store.py`
 
 **Step 1: Write the failing test**
 
-`packages/sdk/open-agent-sdk/tests/test_session_store.py`
+`packages/sdk/openagentic-sdk/tests/test_session_store.py`
 
 ```py
-from open_agent_sdk.events import SystemInit
-from open_agent_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.events import SystemInit
+from openagentic_sdk.sessions.store import FileSessionStore
 
 def test_session_store_writes_events(tmp_path):
     store = FileSessionStore(root_dir=tmp_path)
@@ -202,7 +202,7 @@ def test_session_store_writes_events(tmp_path):
 
 **Step 2: Run test to verify it fails**
 
-Run: `uv run --project packages/sdk/open-agent-sdk pytest -q tests/test_session_store.py::test_session_store_writes_events`
+Run: `uv run --project packages/sdk/openagentic-sdk pytest -q tests/test_session_store.py::test_session_store_writes_events`
 
 Expected: FAIL (missing store)
 
@@ -214,7 +214,7 @@ Expected: FAIL (missing store)
 
 **Step 4: Run test to verify it passes**
 
-Run: `uv run --project packages/sdk/open-agent-sdk pytest -q tests/test_session_store.py::test_session_store_writes_events`
+Run: `uv run --project packages/sdk/openagentic-sdk pytest -q tests/test_session_store.py::test_session_store_writes_events`
 
 Expected: PASS
 
@@ -223,20 +223,20 @@ Expected: PASS
 ### Task 4: Tool interface + registry (Read/Glob/Grep first)
 
 **Files:**
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/base.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/registry.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/read.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/glob.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/grep.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_tools_read_glob_grep.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/base.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/registry.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/read.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/glob.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/grep.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_tools_read_glob_grep.py`
 
 **Step 1: Write failing tests**
 
-`packages/sdk/open-agent-sdk/tests/test_tools_read_glob_grep.py`
+`packages/sdk/openagentic-sdk/tests/test_tools_read_glob_grep.py`
 
 ```py
-from open_agent_sdk.tools.registry import ToolRegistry
-from open_agent_sdk.tools.read import ReadTool
+from openagentic_sdk.tools.registry import ToolRegistry
+from openagentic_sdk.tools.read import ReadTool
 
 def test_read_tool_reads_file(tmp_path):
     p = tmp_path / "a.txt"
@@ -248,7 +248,7 @@ def test_read_tool_reads_file(tmp_path):
 
 **Step 2: Run test to verify it fails**
 
-Run: `uv run --project packages/sdk/open-agent-sdk pytest -q tests/test_tools_read_glob_grep.py::test_read_tool_reads_file`
+Run: `uv run --project packages/sdk/openagentic-sdk pytest -q tests/test_tools_read_glob_grep.py::test_read_tool_reads_file`
 
 Expected: FAIL
 
@@ -271,7 +271,7 @@ Add test cases for:
 - `Glob(pattern="**/*.txt", root=tmp_path)`
 - `Grep(query="hello", file_glob="**/*.txt", root=tmp_path)`
 
-Run: `uv run --project packages/sdk/open-agent-sdk pytest -q tests/test_tools_read_glob_grep.py`
+Run: `uv run --project packages/sdk/openagentic-sdk pytest -q tests/test_tools_read_glob_grep.py`
 
 Expected: PASS
 
@@ -280,17 +280,17 @@ Expected: PASS
 ### Task 5: Permissions gate + interactive approver
 
 **Files:**
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/permissions/models.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/permissions/gate.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/permissions/interactive.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_permissions_gate.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/permissions/models.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/permissions/gate.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/permissions/interactive.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_permissions_gate.py`
 
 **Step 1: Write failing tests**
 
 ```py
 import asyncio
 import pytest
-from open_agent_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.permissions.gate import PermissionGate
 
 @pytest.mark.asyncio
 async def test_gate_denies_when_callback_returns_false():
@@ -303,7 +303,7 @@ async def test_gate_denies_when_callback_returns_false():
 
 **Step 2: Run test to verify it fails**
 
-Run: `uv run --project packages/sdk/open-agent-sdk pytest -q tests/test_permissions_gate.py::test_gate_denies_when_callback_returns_false`
+Run: `uv run --project packages/sdk/openagentic-sdk pytest -q tests/test_permissions_gate.py::test_gate_denies_when_callback_returns_false`
 
 Expected: FAIL
 
@@ -325,9 +325,9 @@ Expected: PASS
 ### Task 6: Hooks (audit + block + rewrite tool I/O)
 
 **Files:**
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/hooks/models.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/hooks/engine.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_hooks_rewrite.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/hooks/models.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/hooks/engine.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_hooks_rewrite.py`
 
 **Step 1: Write failing tests**
 
@@ -350,9 +350,9 @@ Rules:
 ### Task 7: Provider interface + OpenAI provider (non-streaming first)
 
 **Files:**
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/providers/base.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/providers/openai.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_openai_provider_non_stream.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/providers/base.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/providers/openai.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_openai_provider_non_stream.py`
 
 **Step 1: Write failing tests (mock HTTP)**
 
@@ -376,8 +376,8 @@ Implement a single request/response round:
 ### Task 8: OpenAI streaming support (SSE)
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/providers/openai.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_openai_provider_stream.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/providers/openai.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_openai_provider_stream.py`
 
 **Step 1: Write failing test**
 
@@ -399,10 +399,10 @@ Yield:
 ### Task 9: Runtime loop (`query()`), tool execution, and `run()`
 
 **Files:**
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/options.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/runtime.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/api.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_runtime_tool_loop.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/options.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/runtime.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/api.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_runtime_tool_loop.py`
 
 **Step 1: Write failing test using a fake provider**
 
@@ -439,9 +439,9 @@ Responsibilities:
 ### Task 10: `Task` tool (subagents)
 
 **Files:**
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/task.py`
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/runtime.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_subagent_task.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/task.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/runtime.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_subagent_task.py`
 
 **Step 1: Write failing test**
 
@@ -465,12 +465,12 @@ Trigger `Task` tool use and assert:
 ### Task 11: Implement remaining built-in tools (Write/Edit/Bash/WebFetch/WebSearch/Tavily)
 
 **Files:**
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/write.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/edit.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/bash.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/web_fetch.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/web_search_tavily.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_tools_bash_web.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/write.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/edit.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/bash.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/web_fetch.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/web_search_tavily.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_tools_bash_web.py`
 
 **Step 1: Write failing tests**
 
@@ -497,9 +497,9 @@ Security rails:
 ### Task 12: `.claude` settings loader + Skills/Commands integration
 
 **Files:**
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/project/loader.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/slash_command.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_project_claude_loader.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/project/loader.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/slash_command.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_project_claude_loader.py`
 
 **Step 1: Write failing tests**
 
@@ -528,10 +528,10 @@ Assert loader returns:
 ### Task 13: Docs + examples + MCP placeholder
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/README.md`
-- Create: `packages/sdk/open-agent-sdk/examples/basic.py`
-- Create: `packages/sdk/open-agent-sdk/examples/approvals.py`
-- Create: `packages/sdk/open-agent-sdk/examples/subagents.py`
+- Modify: `packages/sdk/openagentic-sdk/README.md`
+- Create: `packages/sdk/openagentic-sdk/examples/basic.py`
+- Create: `packages/sdk/openagentic-sdk/examples/approvals.py`
+- Create: `packages/sdk/openagentic-sdk/examples/subagents.py`
 
 **Step 1: Add README sections**
 
@@ -548,7 +548,7 @@ Examples should run without network if provider is swapped for a fake provider; 
 
 **Step 3: Smoke-test examples**
 
-Run (syntax check): `uv run --project packages/sdk/open-agent-sdk python -m py_compile examples/*.py`
+Run (syntax check): `uv run --project packages/sdk/openagentic-sdk python -m py_compile examples/*.py`
 
 Expected: no output (success)
 
@@ -558,7 +558,7 @@ Expected: no output (success)
 
 Run:
 
-- `uv run --project packages/sdk/open-agent-sdk pytest -q`
+- `uv run --project packages/sdk/openagentic-sdk pytest -q`
 
 Expected: PASS (all tests)
 
@@ -566,7 +566,7 @@ Expected: PASS (all tests)
 
 ## Execution handoff
 
-Plan complete and saved to `docs/plans/2026-01-22-open-agent-sdk-python-implementation-plan.md`.
+Plan complete and saved to `docs/plans/2026-01-22-openagentic-sdk-python-implementation-plan.md`.
 
 Two execution options:
 

@@ -1,6 +1,6 @@
 import unittest
 
-from open_agent_sdk.providers.sse import parse_sse_events
+from openagentic_sdk.providers.sse import parse_sse_events
 
 
 class TestSSEParser(unittest.TestCase):

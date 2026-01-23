@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Over ~10 hours, harden the current `packages/sdk/open-agent-sdk/` scaffold into a usable “v0.1” SDK: installable package, stable event model, approvals + hooks, OpenAI streaming, subagents, `.claude` loading, and documentation, while keeping the code pure-Python and offline-testable.
+**Goal:** Over ~10 hours, harden the current `packages/sdk/openagentic-sdk/` scaffold into a usable “v0.1” SDK: installable package, stable event model, approvals + hooks, OpenAI streaming, subagents, `.claude` loading, and documentation, while keeping the code pure-Python and offline-testable.
 
 **Architecture:** Keep the layered split already started: runtime (loop) + providers + tools + permissions + hooks + sessions + project settings. Add the minimum missing “production shape” pieces: packaging, better defaults, streaming, richer `.claude` integration, and reliability rails (limits/redaction).
 
@@ -14,7 +14,7 @@
 
 Confirm current green state:
 
-- Run: `PYTHONPATH=packages/sdk/open-agent-sdk python3 -m unittest discover -s packages/sdk/open-agent-sdk/tests -p 'test_*.py' -q`
+- Run: `PYTHONPATH=packages/sdk/openagentic-sdk python3 -m unittest discover -s packages/sdk/openagentic-sdk/tests -p 'test_*.py' -q`
 - Expected: PASS (all tests)
 
 ---
@@ -24,45 +24,45 @@ Confirm current green state:
 ### Task 1: Editable install + test runner docs
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/pyproject.toml`
-- Modify: `packages/sdk/open-agent-sdk/README.md`
-- Create: `packages/sdk/open-agent-sdk/tests/test_install_import.py`
+- Modify: `packages/sdk/openagentic-sdk/pyproject.toml`
+- Modify: `packages/sdk/openagentic-sdk/README.md`
+- Create: `packages/sdk/openagentic-sdk/tests/test_install_import.py`
 
 **Step 1: Write the failing test**
 
-`packages/sdk/open-agent-sdk/tests/test_install_import.py`
+`packages/sdk/openagentic-sdk/tests/test_install_import.py`
 
 ```py
 import unittest
 
 class TestInstallImport(unittest.TestCase):
     def test_import_when_installed(self) -> None:
-        import open_agent_sdk  # noqa: F401
+        import openagentic_sdk  # noqa: F401
 ```
 
 **Step 2: Run test to verify it fails**
 
 Run (no PYTHONPATH, no install): `python3 -m unittest -q`
-Workdir: `packages/sdk/open-agent-sdk`
-Expected: FAIL with `ModuleNotFoundError: open_agent_sdk`
+Workdir: `packages/sdk/openagentic-sdk`
+Expected: FAIL with `ModuleNotFoundError: openagentic_sdk`
 
 **Step 3: Update packaging config**
 
-`packages/sdk/open-agent-sdk/pyproject.toml`:
+`packages/sdk/openagentic-sdk/pyproject.toml`:
 - Add `project.scripts` (optional) for a smoke entrypoint later
-- Ensure setuptools includes `open_agent_sdk` package
+- Ensure setuptools includes `openagentic_sdk` package
 
 **Step 4: Verify editable install works**
 
-Run: `python3 -m pip install -e packages/sdk/open-agent-sdk`
+Run: `python3 -m pip install -e packages/sdk/openagentic-sdk`
 Expected: installs from local path, no downloads
 
-Run: `python3 -m unittest discover -s packages/sdk/open-agent-sdk/tests -p 'test_*.py' -q`
+Run: `python3 -m unittest discover -s packages/sdk/openagentic-sdk/tests -p 'test_*.py' -q`
 Expected: PASS
 
 **Step 5: Document it**
 
-Update `packages/sdk/open-agent-sdk/README.md` to include:
+Update `packages/sdk/openagentic-sdk/README.md` to include:
 - “editable install” path
 - “tests without PYTHONPATH” path
 
@@ -73,9 +73,9 @@ Update `packages/sdk/open-agent-sdk/README.md` to include:
 ### Task 2: Event compatibility rules + versioning
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/events.py`
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/serialization.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_events_contract.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/events.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/serialization.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_events_contract.py`
 
 **Step 1: Write failing contract test**
 
@@ -86,7 +86,7 @@ Define a contract:
 
 **Step 2: Run test to verify it fails**
 
-Run: `PYTHONPATH=packages/sdk/open-agent-sdk python3 -m unittest -q tests/test_events_contract.py`
+Run: `PYTHONPATH=packages/sdk/openagentic-sdk python3 -m unittest -q tests/test_events_contract.py`
 Expected: FAIL until rules are enforced
 
 **Step 3: Implement minimal contract checks**
@@ -106,9 +106,9 @@ Expected: PASS
 ### Task 3: Session root selection + redaction hooks
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/sessions/store.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/sessions/redaction.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_session_redaction.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/sessions/store.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/sessions/redaction.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_session_redaction.py`
 
 **Step 1: Write failing test**
 
@@ -129,9 +129,9 @@ Expected: PASS
 ### Task 4: Interactive approver module and structured approval context
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/permissions/gate.py`
-- Create: `packages/sdk/open-agent-sdk/open_agent_sdk/permissions/interactive.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_permissions_prompt.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/permissions/gate.py`
+- Create: `packages/sdk/openagentic-sdk/openagentic_sdk/permissions/interactive.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_permissions_prompt.py`
 
 **Step 1: Write failing test**
 
@@ -154,9 +154,9 @@ Expected: PASS
 ### Task 5: Improve Edit safety + Bash output limits default
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/edit.py`
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/tools/bash.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_edit_edge_cases.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/edit.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/tools/bash.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_edit_edge_cases.py`
 
 **Step 1: Write failing tests**
 
@@ -179,8 +179,8 @@ Expected: PASS
 ### Task 6: Streaming parser with injected transport
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/providers/openai.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_openai_provider_streaming.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/providers/openai.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_openai_provider_streaming.py`
 
 **Step 1: Write failing test**
 
@@ -207,9 +207,9 @@ Expected: PASS
 ### Task 7: Runtime supports provider streaming
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/runtime.py`
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/api.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_runtime_streaming.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/runtime.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/api.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_runtime_streaming.py`
 
 **Step 1: Write failing test**
 
@@ -230,9 +230,9 @@ Expected: PASS
 ### Task 8: Load `.claude` settings and expose to model
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/runtime.py`
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/project/claude.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_runtime_claude_injection.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/runtime.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/project/claude.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_runtime_claude_injection.py`
 
 **Step 1: Write failing test**
 
@@ -257,9 +257,9 @@ Expected: PASS
 ### Task 9: AgentDefinition tool scoping and output shaping
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/runtime.py`
-- Modify: `packages/sdk/open-agent-sdk/open_agent_sdk/options.py`
-- Create: `packages/sdk/open-agent-sdk/tests/test_task_tool_scoping.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/runtime.py`
+- Modify: `packages/sdk/openagentic-sdk/openagentic_sdk/options.py`
+- Create: `packages/sdk/openagentic-sdk/tests/test_task_tool_scoping.py`
 
 **Step 1: Write failing test**
 
@@ -280,10 +280,10 @@ Expected: PASS
 ### Task 10: Examples and acceptance docs
 
 **Files:**
-- Modify: `packages/sdk/open-agent-sdk/README.md`
-- Create: `packages/sdk/open-agent-sdk/examples/basic_query.py`
-- Create: `packages/sdk/open-agent-sdk/examples/approvals.py`
-- Create: `packages/sdk/open-agent-sdk/examples/subagents.py`
+- Modify: `packages/sdk/openagentic-sdk/README.md`
+- Create: `packages/sdk/openagentic-sdk/examples/basic_query.py`
+- Create: `packages/sdk/openagentic-sdk/examples/approvals.py`
+- Create: `packages/sdk/openagentic-sdk/examples/subagents.py`
 
 **Step 1: Write minimal examples**
 
@@ -293,7 +293,7 @@ Expected: PASS
 
 **Step 2: Syntax check examples**
 
-Run: `PYTHONPATH=packages/sdk/open-agent-sdk python3 -m py_compile packages/sdk/open-agent-sdk/examples/*.py`
+Run: `PYTHONPATH=packages/sdk/openagentic-sdk python3 -m py_compile packages/sdk/openagentic-sdk/examples/*.py`
 Expected: success (no output)
 
 **Step 3: Acceptance checklist**

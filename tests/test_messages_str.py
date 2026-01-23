@@ -3,13 +3,13 @@ import unittest
 
 class TestMessagesStr(unittest.TestCase):
     def test_assistant_text_str(self) -> None:
-        from open_agent_sdk.messages import AssistantMessage, TextBlock
+        from openagentic_sdk.messages import AssistantMessage, TextBlock
 
         m = AssistantMessage(model="m", content=[TextBlock(text="Hello")])
         self.assertEqual(str(m), "Hello")
 
     def test_tool_use_str_is_compact(self) -> None:
-        from open_agent_sdk.messages import AssistantMessage, ToolUseBlock
+        from openagentic_sdk.messages import AssistantMessage, ToolUseBlock
 
         m = AssistantMessage(model="m", content=[ToolUseBlock(id="t1", name="Read", input={"file_path": "a.txt"})])
         s = str(m)
@@ -18,14 +18,14 @@ class TestMessagesStr(unittest.TestCase):
         self.assertIn("file_path", s)
 
     def test_tool_result_str_is_compact(self) -> None:
-        from open_agent_sdk.messages import AssistantMessage, ToolResultBlock
+        from openagentic_sdk.messages import AssistantMessage, ToolResultBlock
 
         m = AssistantMessage(model="m", content=[ToolResultBlock(tool_use_id="t1", content='{"ok":true}', is_error=False)])
         s = str(m)
         self.assertIn("[tool.result] t1 ok", s)
 
     def test_result_message_does_not_duplicate_text(self) -> None:
-        from open_agent_sdk.messages import ResultMessage
+        from openagentic_sdk.messages import ResultMessage
 
         m = ResultMessage(
             subtype="success",

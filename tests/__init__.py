@@ -1,1 +1,1 @@
-"""Test package for open-agent-sdk."""
+"""Test package for openagentic-sdk."""

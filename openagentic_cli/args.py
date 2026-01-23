@@ -21,7 +21,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_logs = sub.add_parser("logs", help="Summarize session events")
     p_logs.add_argument("session_id", help="Session id to summarize")
-    p_logs.add_argument("--session-root", default=None, help="Session root directory (default: ~/.open-agent-sdk)")
+    p_logs.add_argument(
+        "--session-root",
+        default=None,
+        help="Session root directory (default: ~/.openagentic-sdk; env: OPENAGENTIC_SDK_HOME; legacy: OPEN_AGENT_SDK_HOME)",
+    )
 
     return parser
 

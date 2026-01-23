@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
-from open_agent_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.permissions.gate import PermissionGate
 
 
 PromptFn = Callable[[str], bool]

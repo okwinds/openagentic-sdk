@@ -4,10 +4,10 @@ from unittest import mock
 
 class TestConsoleRunHelpers(unittest.TestCase):
     def test_console_query_non_debug_exits_cleanly(self) -> None:
-        from open_agent_sdk.console import ConsoleRenderer
-        from open_agent_sdk.console.run import console_query
-        from open_agent_sdk.options import OpenAgentOptions
-        from open_agent_sdk.providers.openai_compatible import OpenAICompatibleProvider
+        from openagentic_sdk.console import ConsoleRenderer
+        from openagentic_sdk.console.run import console_query
+        from openagentic_sdk.options import OpenAgentOptions
+        from openagentic_sdk.providers.openai_compatible import OpenAICompatibleProvider
 
         options = OpenAgentOptions(provider=OpenAICompatibleProvider(), model="m", api_key="k", cwd=".")
 
@@ -16,7 +16,7 @@ class TestConsoleRunHelpers(unittest.TestCase):
             if False:  # pragma: no cover
                 yield  # noqa: B018
 
-        with mock.patch("open_agent_sdk.console.run.query", boom):
+        with mock.patch("openagentic_sdk.console.run.query", boom):
             with self.assertRaises(SystemExit) as ctx:
                 import asyncio
 
@@ -24,10 +24,10 @@ class TestConsoleRunHelpers(unittest.TestCase):
         self.assertIn("boom", str(ctx.exception))
 
     def test_console_query_debug_re_raises(self) -> None:
-        from open_agent_sdk.console import ConsoleRenderer
-        from open_agent_sdk.console.run import console_query
-        from open_agent_sdk.options import OpenAgentOptions
-        from open_agent_sdk.providers.openai_compatible import OpenAICompatibleProvider
+        from openagentic_sdk.console import ConsoleRenderer
+        from openagentic_sdk.console.run import console_query
+        from openagentic_sdk.options import OpenAgentOptions
+        from openagentic_sdk.providers.openai_compatible import OpenAICompatibleProvider
 
         options = OpenAgentOptions(provider=OpenAICompatibleProvider(), model="m", api_key="k", cwd=".")
 
@@ -36,7 +36,7 @@ class TestConsoleRunHelpers(unittest.TestCase):
             if False:  # pragma: no cover
                 yield  # noqa: B018
 
-        with mock.patch("open_agent_sdk.console.run.query", boom):
+        with mock.patch("openagentic_sdk.console.run.query", boom):
             with self.assertRaises(RuntimeError):
                 import asyncio
 

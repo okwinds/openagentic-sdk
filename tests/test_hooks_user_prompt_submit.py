@@ -2,12 +2,12 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.hooks.engine import HookEngine
-from open_agent_sdk.hooks.models import HookDecision, HookMatcher
-from open_agent_sdk.options import OpenAgentOptions
-from open_agent_sdk.permissions.gate import PermissionGate
-from open_agent_sdk.providers.base import ModelOutput
-from open_agent_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.hooks.engine import HookEngine
+from openagentic_sdk.hooks.models import HookDecision, HookMatcher
+from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.providers.base import ModelOutput
+from openagentic_sdk.sessions.store import FileSessionStore
 
 
 class CapturingProvider:
@@ -43,9 +43,9 @@ class TestUserPromptSubmitHook(unittest.IsolatedAsyncioTestCase):
                 session_store=store,
                 hooks=hooks,
             )
-            import open_agent_sdk
+            import openagentic_sdk
 
-            async for e in open_agent_sdk.query(prompt="original", options=options):
+            async for e in openagentic_sdk.query(prompt="original", options=options):
                 if getattr(e, "type", None) == "result":
                     break
 

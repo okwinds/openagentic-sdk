@@ -5,7 +5,8 @@ import os
 import sys
 from pathlib import Path
 
-from open_agent_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.paths import default_session_root
 
 from .args import build_parser
 from .config import build_options
@@ -70,8 +71,7 @@ def main(argv: list[str] | None = None) -> int:
         if root:
             root_dir = Path(str(root)).expanduser()
         else:
-            env = os.environ.get("OPEN_AGENT_SDK_HOME")
-            root_dir = Path(env).expanduser() if env else Path.home() / ".open-agent-sdk"
+            root_dir = default_session_root()
         store = FileSessionStore(root_dir=root_dir)
         sid = str(getattr(ns, "session_id", "") or "")
         events = store.read_events(sid)

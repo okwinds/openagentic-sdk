@@ -3,7 +3,7 @@ import unittest
 
 class TestCliInlineCodeHighlighter(unittest.TestCase):
     def test_highlights_inline_backticks_not_fences(self) -> None:
-        from open_agent_cli.style import InlineCodeHighlighter
+        from openagentic_cli.style import InlineCodeHighlighter
 
         h = InlineCodeHighlighter(enabled=True)
         s1 = h.feed("hi `x` ok\n```py\nprint(1)\n```\n")
@@ -11,7 +11,7 @@ class TestCliInlineCodeHighlighter(unittest.TestCase):
         self.assertIn("```py", s1)
 
     def test_streaming_chunks_keep_state(self) -> None:
-        from open_agent_cli.style import InlineCodeHighlighter
+        from openagentic_cli.style import InlineCodeHighlighter
 
         h = InlineCodeHighlighter(enabled=True)
         a = h.feed("hi `x")

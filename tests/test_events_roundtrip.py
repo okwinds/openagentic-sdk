@@ -1,7 +1,7 @@
 import unittest
 
-from open_agent_sdk.events import SystemInit
-from open_agent_sdk.serialization import dumps_event, loads_event
+from openagentic_sdk.events import SystemInit
+from openagentic_sdk.serialization import dumps_event, loads_event
 
 
 class TestEventRoundtrip(unittest.TestCase):

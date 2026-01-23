@@ -2,9 +2,9 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.options import OpenAgentOptions
-from open_agent_sdk.permissions.gate import PermissionGate
-from open_agent_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.sessions.store import FileSessionStore
 
 
 class FakeStreamingProvider:
@@ -30,10 +30,10 @@ class TestRuntimeStreaming(unittest.IsolatedAsyncioTestCase):
                 permission_gate=PermissionGate(permission_mode="bypass"),
                 session_store=store,
             )
-            import open_agent_sdk
+            import openagentic_sdk
 
             types = []
-            async for e in open_agent_sdk.query(prompt="hi", options=options):
+            async for e in openagentic_sdk.query(prompt="hi", options=options):
                 types.append(getattr(e, "type", None))
             self.assertIn("assistant.delta", types)
             self.assertIn("assistant.message", types)

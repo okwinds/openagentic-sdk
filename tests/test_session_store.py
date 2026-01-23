@@ -2,8 +2,8 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.events import SystemInit
-from open_agent_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.events import SystemInit
+from openagentic_sdk.sessions.store import FileSessionStore
 
 
 class TestSessionStore(unittest.TestCase):

@@ -5,8 +5,8 @@ import unittest
 
 class TestConsoleRenderer(unittest.TestCase):
     def test_renderer_dedupes_streaming(self) -> None:
-        from open_agent_sdk.console import ConsoleRenderer
-        from open_agent_sdk.events import AssistantDelta, AssistantMessage
+        from openagentic_sdk.console import ConsoleRenderer
+        from openagentic_sdk.events import AssistantDelta, AssistantMessage
 
         buf = io.StringIO()
         r = ConsoleRenderer(stream=buf, debug=False)
@@ -16,8 +16,8 @@ class TestConsoleRenderer(unittest.TestCase):
         self.assertEqual(buf.getvalue(), "hello world\n")
 
     def test_renderer_prints_todowrite_list_from_events(self) -> None:
-        from open_agent_sdk.console import ConsoleRenderer
-        from open_agent_sdk.events import ToolResult, ToolUse
+        from openagentic_sdk.console import ConsoleRenderer
+        from openagentic_sdk.events import ToolResult, ToolUse
 
         buf = io.StringIO()
         r = ConsoleRenderer(stream=buf, debug=False)
@@ -47,8 +47,8 @@ class TestConsoleRenderer(unittest.TestCase):
         self.assertIn("- [pending] Do B", out)
 
     def test_renderer_prints_todowrite_list_from_messages(self) -> None:
-        from open_agent_sdk.console import ConsoleRenderer
-        from open_agent_sdk.messages import AssistantMessage, ToolResultBlock, ToolUseBlock
+        from openagentic_sdk.console import ConsoleRenderer
+        from openagentic_sdk.messages import AssistantMessage, ToolResultBlock, ToolUseBlock
 
         buf = io.StringIO()
         r = ConsoleRenderer(stream=buf, debug=False)
@@ -87,8 +87,8 @@ class TestConsoleRenderer(unittest.TestCase):
         self.assertIn("- [in_progress] Doing A", out)
 
     def test_renderer_dedupes_streaming_messages(self) -> None:
-        from open_agent_sdk.console import ConsoleRenderer
-        from open_agent_sdk.messages import AssistantMessage, StreamEvent, TextBlock
+        from openagentic_sdk.console import ConsoleRenderer
+        from openagentic_sdk.messages import AssistantMessage, StreamEvent, TextBlock
 
         buf = io.StringIO()
         r = ConsoleRenderer(stream=buf, debug=False)
@@ -98,8 +98,8 @@ class TestConsoleRenderer(unittest.TestCase):
         self.assertEqual(buf.getvalue(), "hello world\n")
 
     def test_renderer_hides_result_message_by_default(self) -> None:
-        from open_agent_sdk.console import ConsoleRenderer
-        from open_agent_sdk.messages import ResultMessage
+        from openagentic_sdk.console import ConsoleRenderer
+        from openagentic_sdk.messages import ResultMessage
 
         buf = io.StringIO()
         r = ConsoleRenderer(stream=buf, debug=False)
@@ -117,8 +117,8 @@ class TestConsoleRenderer(unittest.TestCase):
         self.assertEqual(buf.getvalue(), "")
 
     def test_renderer_prints_skill_list_from_events(self) -> None:
-        from open_agent_sdk.console import ConsoleRenderer
-        from open_agent_sdk.events import ToolResult, ToolUse
+        from openagentic_sdk.console import ConsoleRenderer
+        from openagentic_sdk.events import ToolResult, ToolUse
 
         buf = io.StringIO()
         r = ConsoleRenderer(stream=buf, debug=False)
@@ -136,8 +136,8 @@ class TestConsoleRenderer(unittest.TestCase):
         self.assertIn("`a`", out)
 
     def test_renderer_prints_skill_list_from_messages(self) -> None:
-        from open_agent_sdk.console import ConsoleRenderer
-        from open_agent_sdk.messages import AssistantMessage, ToolResultBlock, ToolUseBlock
+        from openagentic_sdk.console import ConsoleRenderer
+        from openagentic_sdk.messages import AssistantMessage, ToolResultBlock, ToolUseBlock
 
         buf = io.StringIO()
         r = ConsoleRenderer(stream=buf, debug=False)
@@ -154,8 +154,8 @@ class TestConsoleRenderer(unittest.TestCase):
         self.assertIn("`a`", out)
 
     def test_renderer_prints_skill_load_from_events(self) -> None:
-        from open_agent_sdk.console import ConsoleRenderer
-        from open_agent_sdk.events import ToolResult, ToolUse
+        from openagentic_sdk.console import ConsoleRenderer
+        from openagentic_sdk.events import ToolResult, ToolUse
 
         buf = io.StringIO()
         r = ConsoleRenderer(stream=buf, debug=False)

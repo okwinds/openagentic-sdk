@@ -1,12 +1,12 @@
 import io
 import unittest
 
-from open_agent_sdk.events import AssistantDelta, AssistantMessage, HookEvent, ToolResult, ToolUse
+from openagentic_sdk.events import AssistantDelta, AssistantMessage, HookEvent, ToolResult, ToolUse
 
 
 class TestCliTraceRenderer(unittest.TestCase):
     def test_groups_tools_and_summarizes(self) -> None:
-        from open_agent_cli.trace import TraceRenderer
+        from openagentic_cli.trace import TraceRenderer
 
         out = io.StringIO()
         r = TraceRenderer(stream=out, color=False)
@@ -25,7 +25,7 @@ class TestCliTraceRenderer(unittest.TestCase):
         self.assertIn("exit_code=0", s)
 
     def test_rg_help_is_printed_when_missing_pattern(self) -> None:
-        from open_agent_cli.trace import TraceRenderer
+        from openagentic_cli.trace import TraceRenderer
 
         out = io.StringIO()
         r = TraceRenderer(stream=out, color=False)
@@ -40,7 +40,7 @@ class TestCliTraceRenderer(unittest.TestCase):
         self.assertIn("hint:", out.getvalue())
 
     def test_rg_help_is_printed_when_rg_missing(self) -> None:
-        from open_agent_cli.trace import TraceRenderer
+        from openagentic_cli.trace import TraceRenderer
 
         out = io.StringIO()
         r = TraceRenderer(stream=out, color=False)
@@ -56,7 +56,7 @@ class TestCliTraceRenderer(unittest.TestCase):
         self.assertIn("winget install BurntSushi.ripgrep.MSVC", s)
 
     def test_streaming_deltas_do_not_duplicate_final(self) -> None:
-        from open_agent_cli.trace import TraceRenderer
+        from openagentic_cli.trace import TraceRenderer
 
         out = io.StringIO()
         r = TraceRenderer(stream=out, color=False)
@@ -65,7 +65,7 @@ class TestCliTraceRenderer(unittest.TestCase):
         self.assertEqual(out.getvalue(), "hi\n")
 
     def test_hook_event_is_rendered(self) -> None:
-        from open_agent_cli.trace import TraceRenderer
+        from openagentic_cli.trace import TraceRenderer
 
         out = io.StringIO()
         r = TraceRenderer(stream=out, color=False, show_hooks=True)
@@ -73,7 +73,7 @@ class TestCliTraceRenderer(unittest.TestCase):
         self.assertIn("• Hooks", out.getvalue())
 
     def test_error_message_is_rendered(self) -> None:
-        from open_agent_cli.trace import TraceRenderer
+        from openagentic_cli.trace import TraceRenderer
 
         out = io.StringIO()
         r = TraceRenderer(stream=out, color=False)

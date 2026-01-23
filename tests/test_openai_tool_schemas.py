@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from open_agent_sdk.tools.openai import tool_schemas_for_openai
+from openagentic_sdk.tools.openai import tool_schemas_for_openai
 
 
 class TestOpenAiToolSchemas(unittest.TestCase):

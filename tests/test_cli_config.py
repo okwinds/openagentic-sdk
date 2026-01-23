@@ -4,7 +4,7 @@ import unittest
 
 class TestCliConfig(unittest.TestCase):
     def test_rightcode_defaults(self) -> None:
-        from open_agent_cli.config import build_options
+        from openagentic_cli.config import build_options
 
         os.environ["RIGHTCODE_API_KEY"] = "x"
         try:
@@ -19,7 +19,7 @@ class TestCliConfig(unittest.TestCase):
             os.environ.pop("RIGHTCODE_API_KEY", None)
 
     def test_interactive_prompt_has_approver(self) -> None:
-        from open_agent_cli.config import build_options
+        from openagentic_cli.config import build_options
 
         os.environ["RIGHTCODE_API_KEY"] = "x"
         try:

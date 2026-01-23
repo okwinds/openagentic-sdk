@@ -37,7 +37,7 @@ class TestOpenAICompatibleRetry(unittest.TestCase):
         import urllib.error
         import urllib.request
 
-        from open_agent_sdk.providers import openai_compatible as mod
+        from openagentic_sdk.providers import openai_compatible as mod
 
         http_err = urllib.error.HTTPError(
             url="https://x/chat/completions",
@@ -68,7 +68,7 @@ class TestOpenAICompatibleRetry(unittest.TestCase):
         import urllib.error
         import urllib.request
 
-        from open_agent_sdk.providers import openai_compatible as mod
+        from openagentic_sdk.providers import openai_compatible as mod
 
         http_err = urllib.error.HTTPError(
             url="https://x/chat/completions",

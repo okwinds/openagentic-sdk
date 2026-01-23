@@ -1,6 +1,6 @@
 import unittest
 
-from open_agent_sdk.messages import AssistantMessage, TextBlock, ToolUseBlock
+from openagentic_sdk.messages import AssistantMessage, TextBlock, ToolUseBlock
 
 
 class TestBlocks(unittest.TestCase):

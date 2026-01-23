@@ -17,7 +17,7 @@
 
 **Step 1:** Add `example_debug_enabled()` that reads:
 - `--debug` in argv OR
-- `OPEN_AGENT_SDK_EXAMPLE_DEBUG=1`
+- `OPENAGENTIC_SDK_EXAMPLE_DEBUG=1`
 
 **Step 2:** Add `EventPrinter` with:
 - default: print assistant text (deltas + final message), optionally prefix agent name
@@ -58,7 +58,7 @@
 
 **Step 1:** Document:
 - `--debug`
-- `OPEN_AGENT_SDK_EXAMPLE_DEBUG=1`
+- `OPENAGENTIC_SDK_EXAMPLE_DEBUG=1`
 
 **Step 2:** Run:
 - `python3 -m unittest -q`

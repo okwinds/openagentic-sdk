@@ -1,6 +1,6 @@
 import unittest
 
-from open_agent_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.permissions.gate import PermissionGate
 
 
 class TestPermissionGate(unittest.IsolatedAsyncioTestCase):

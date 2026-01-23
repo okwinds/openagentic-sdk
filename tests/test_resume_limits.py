@@ -2,9 +2,9 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.events import AssistantMessage, SystemInit
-from open_agent_sdk.sessions.rebuild import rebuild_messages
-from open_agent_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.events import AssistantMessage, SystemInit
+from openagentic_sdk.sessions.rebuild import rebuild_messages
+from openagentic_sdk.sessions.store import FileSessionStore
 
 
 class TestResumeLimits(unittest.TestCase):

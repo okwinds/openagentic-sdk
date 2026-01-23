@@ -1,6 +1,6 @@
 import unittest
 
-from open_agent_sdk.hooks.engine import _match_name
+from openagentic_sdk.hooks.engine import _match_name
 
 
 class TestHookMatcherOr(unittest.TestCase):

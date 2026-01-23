@@ -3,9 +3,9 @@ import io
 import os
 import unittest
 
-from open_agent_sdk.options import OpenAgentOptions
-from open_agent_sdk.permissions.gate import PermissionGate
-from open_agent_sdk.providers.openai_compatible import OpenAICompatibleProvider
+from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.providers.openai_compatible import OpenAICompatibleProvider
 
 
 class _TtyStringIO(io.StringIO):
@@ -15,8 +15,8 @@ class _TtyStringIO(io.StringIO):
 
 class TestCliPromptStyling(unittest.TestCase):
     def test_prompt_uses_gray_background_when_color_enabled(self) -> None:
-        from open_agent_cli.repl import run_chat
-        from open_agent_cli.style import StyleConfig
+        from openagentic_cli.repl import run_chat
+        from openagentic_cli.style import StyleConfig
 
         os.environ.pop("NO_COLOR", None)
         os.environ["COLUMNS"] = "40"

@@ -2,7 +2,7 @@ import asyncio
 import unittest
 from pathlib import Path
 
-from open_agent_cli.permissions import CliPermissionPolicy, build_permission_gate
+from openagentic_cli.permissions import CliPermissionPolicy, build_permission_gate
 
 
 class TestCliPermissions(unittest.TestCase):

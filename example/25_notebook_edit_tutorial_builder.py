@@ -4,7 +4,7 @@ import asyncio
 import json
 
 from _common import example_artifact_dir, repo_root, rightcode_options
-from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled, console_query
+from openagentic_sdk.console import ConsoleRenderer, console_debug_enabled, console_query
 
 
 async def main() -> None:

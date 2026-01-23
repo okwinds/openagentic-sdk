@@ -3,12 +3,12 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.tools.base import ToolContext
-from open_agent_sdk.tools.bash import BashTool
-from open_agent_sdk.tools.edit import EditTool
-from open_agent_sdk.tools.web_fetch import WebFetchTool
-from open_agent_sdk.tools.web_search_tavily import WebSearchTool
-from open_agent_sdk.tools.write import WriteTool
+from openagentic_sdk.tools.base import ToolContext
+from openagentic_sdk.tools.bash import BashTool
+from openagentic_sdk.tools.edit import EditTool
+from openagentic_sdk.tools.web_fetch import WebFetchTool
+from openagentic_sdk.tools.web_search_tavily import WebSearchTool
+from openagentic_sdk.tools.write import WriteTool
 
 
 class TestMoreTools(unittest.TestCase):

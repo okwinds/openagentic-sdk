@@ -4,7 +4,7 @@ import unittest
 
 class TestCliProviderToolSchemas(unittest.TestCase):
     def test_rightcode_provider_is_openai_compatible(self) -> None:
-        from open_agent_cli.config import build_options
+        from openagentic_cli.config import build_options
 
         os.environ["RIGHTCODE_API_KEY"] = "x"
         try:

@@ -1,11 +1,11 @@
 import unittest
 
-from open_agent_sdk.serialization import dumps_event, loads_event
+from openagentic_sdk.serialization import dumps_event, loads_event
 
 
 class TestUserMessageEvent(unittest.TestCase):
     def test_roundtrip(self) -> None:
-        from open_agent_sdk.events import UserMessage
+        from openagentic_sdk.events import UserMessage
 
         e1 = UserMessage(text="hi")
         raw = dumps_event(e1)

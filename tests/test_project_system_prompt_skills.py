@@ -5,9 +5,9 @@ from pathlib import Path
 
 class TestProjectSystemPromptSkills(unittest.TestCase):
     def test_system_prompt_includes_execute_skill_rule(self) -> None:
-        from open_agent_sdk.options import OpenAgentOptions
-        from open_agent_sdk.providers.openai_compatible import OpenAICompatibleProvider
-        from open_agent_sdk.runtime import _build_project_system_prompt
+        from openagentic_sdk.options import OpenAgentOptions
+        from openagentic_sdk.providers.openai_compatible import OpenAICompatibleProvider
+        from openagentic_sdk.runtime import _build_project_system_prompt
 
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

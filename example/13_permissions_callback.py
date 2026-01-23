@@ -5,7 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from _common import rightcode_options
-from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled, console_query
+from openagentic_sdk.console import ConsoleRenderer, console_debug_enabled, console_query
 
 
 async def _approver(tool_name, tool_input, context) -> bool:

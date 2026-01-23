@@ -6,7 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from _common import repo_root, rightcode_options
-from open_agent_sdk.console import console_debug_enabled, console_run
+from openagentic_sdk.console import console_debug_enabled, console_run
 
 
 async def main() -> None:
@@ -30,7 +30,7 @@ async def main() -> None:
     print(r2.final_text)
 
     # Show where the runtime persisted the todos.
-    session_root = Path(options1.session_root) if options1.session_root else (repo_root() / ".open-agent-sdk")
+    session_root = Path(options1.session_root) if options1.session_root else (repo_root() / ".openagentic-sdk")
     todo_file = session_root / "sessions" / session_id / "todos.json"
     print(f"todos_path={todo_file}")
     if console_debug_enabled() and todo_file.exists():

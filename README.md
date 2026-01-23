@@ -1,4 +1,4 @@
-# Open Agent SDK (Python)
+# OpenAgentic SDK (Python)
 
 Pure-Python, open-source Agent SDK inspired by the Claude Agent SDK programming model.
 
@@ -47,6 +47,8 @@ Install (editable):
 
 `pip install -e .`
 
+If `oa` isn't found after installation on Windows, add the scripts directory printed by pip to `PATH` (or run `python -m openagentic_cli chat`).
+
 Optional (recommended): install ripgrep (`rg`) so the agent can search your repo quickly when using shell tools.
 
 - Windows (PowerShell): `winget install BurntSushi.ripgrep.MSVC`
@@ -59,7 +61,11 @@ Commands:
 - `oa resume <session_id>` (alias of `oa chat --resume <session_id>`)
 - `oa logs <session_id>` (summarize `events.jsonl`)
 
-Sessions are stored under `~/.open-agent-sdk` by default (override with `OPEN_AGENT_SDK_HOME`).
+Sessions are stored under `~/.openagentic-sdk` by default (override with `OPENAGENTIC_SDK_HOME`; legacy: `OPEN_AGENT_SDK_HOME`).
+
+## Publishing
+
+See `docs/publishing.md`.
 
 ## Usage
 
@@ -67,9 +73,9 @@ Streaming:
 
 ```py
 import asyncio
-from open_agent_sdk import OpenAgentOptions, query
-from open_agent_sdk.providers import OpenAIProvider
-from open_agent_sdk.permissions import PermissionGate
+from openagentic_sdk import OpenAgentOptions, query
+from openagentic_sdk.providers import OpenAIProvider
+from openagentic_sdk.permissions import PermissionGate
 
 
 async def main() -> None:
@@ -92,9 +98,9 @@ One-shot:
 
 ```py
 import asyncio
-from open_agent_sdk import OpenAgentOptions, run
-from open_agent_sdk.providers import OpenAIProvider
-from open_agent_sdk.permissions import PermissionGate
+from openagentic_sdk import OpenAgentOptions, run
+from openagentic_sdk.providers import OpenAIProvider
+from openagentic_sdk.permissions import PermissionGate
 
 
 async def main() -> None:
@@ -114,9 +120,9 @@ asyncio.run(main())
 OpenAI-compatible backend (the examples default to RIGHTCODE):
 
 ```py
-from open_agent_sdk import OpenAgentOptions, run
-from open_agent_sdk.providers.openai_compatible import OpenAICompatibleProvider
-from open_agent_sdk.permissions import PermissionGate
+from openagentic_sdk import OpenAgentOptions, run
+from openagentic_sdk.providers.openai_compatible import OpenAICompatibleProvider
+from openagentic_sdk.permissions import PermissionGate
 
 options = OpenAgentOptions(
     provider=OpenAICompatibleProvider(base_url="https://www.right.codes/codex/v1"),
@@ -157,10 +163,10 @@ When `setting_sources=["project"]`, `query()` prepends a `system` message with p
 
 ## Console output (human-first)
 
-Examples use `open_agent_sdk.console.ConsoleRenderer`, which:
+Examples use `openagentic_sdk.console.ConsoleRenderer`, which:
 
 - Prints assistant text by default (human-friendly).
-- In debug mode (`--debug` or `OPEN_AGENT_SDK_CONSOLE_DEBUG=1`), prints tool/hook/result summaries.
+- In debug mode (`--debug` or `OPENAGENTIC_SDK_CONSOLE_DEBUG=1`; legacy: `OPEN_AGENT_SDK_CONSOLE_DEBUG=1`), prints tool/hook/result summaries.
 
 Try the interactive CLI chat example:
 
@@ -169,4 +175,4 @@ Try the interactive CLI chat example:
 ## Event compatibility
 
 - `events.jsonl` is forward-compatible for added fields: deserialization ignores unknown keys on known event `type`s.
-- Unknown event `type`s raise `open_agent_sdk.errors.UnknownEventTypeError`.
+- Unknown event `type`s raise `openagentic_sdk.errors.UnknownEventTypeError`.

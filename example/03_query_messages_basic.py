@@ -4,7 +4,7 @@ import asyncio
 from dataclasses import replace
 
 from _common import repo_root, rightcode_options
-from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled, console_query_messages
+from openagentic_sdk.console import ConsoleRenderer, console_debug_enabled, console_query_messages
 
 
 async def main() -> None:

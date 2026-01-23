@@ -2,8 +2,8 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.tools.base import ToolContext
-from open_agent_sdk.tools.bash import BashTool
+from openagentic_sdk.tools.base import ToolContext
+from openagentic_sdk.tools.bash import BashTool
 
 
 class TestBashTruncation(unittest.TestCase):

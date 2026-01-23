@@ -3,8 +3,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from open_agent_sdk.tools.base import ToolContext
-from open_agent_sdk.tools.write import WriteTool
+from openagentic_sdk.tools.base import ToolContext
+from openagentic_sdk.tools.write import WriteTool
 
 
 class TestWriteTool(unittest.TestCase):

@@ -5,8 +5,8 @@ from tempfile import TemporaryDirectory
 
 class TestToolContextProjectDir(unittest.TestCase):
     def test_skill_list_defaults_to_ctx_project_dir(self) -> None:
-        from open_agent_sdk.tools.base import ToolContext
-        from open_agent_sdk.tools.defaults import default_tool_registry
+        from openagentic_sdk.tools.base import ToolContext
+        from openagentic_sdk.tools.defaults import default_tool_registry
 
         with TemporaryDirectory() as td:
             root = Path(td)
@@ -20,8 +20,8 @@ class TestToolContextProjectDir(unittest.TestCase):
             self.assertIn("a", names)
 
     def test_slash_command_defaults_to_ctx_project_dir(self) -> None:
-        from open_agent_sdk.tools.base import ToolContext
-        from open_agent_sdk.tools.defaults import default_tool_registry
+        from openagentic_sdk.tools.base import ToolContext
+        from openagentic_sdk.tools.defaults import default_tool_registry
 
         with TemporaryDirectory() as td:
             root = Path(td)

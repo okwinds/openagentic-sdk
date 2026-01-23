@@ -2,15 +2,15 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** 参考 `cladue agent sdk python.md` 的 API 风格，把当前 `open_agent_sdk` 补齐到“可用的 CAS 风格 SDK”：具备 `query()` / “长连接 client” / CAS 消息与 content-block 类型 / 自定义工具（@tool + SDK MCP server）/ 权限与 hooks / 内置工具 I/O 形状对齐（至少覆盖文档列出的工具）。
+**Goal:** 参考 `cladue agent sdk python.md` 的 API 风格，把当前 `openagentic_sdk` 补齐到“可用的 CAS 风格 SDK”：具备 `query()` / “长连接 client” / CAS 消息与 content-block 类型 / 自定义工具（@tool + SDK MCP server）/ 权限与 hooks / 内置工具 I/O 形状对齐（至少覆盖文档列出的工具）。
 
-**Architecture:** 不新增“外部 wrapper 包”（不做 `claude_agent_sdk` 兼容层），直接在 `open_agent_sdk` 内新增/扩展模块与 API：保留现有 event-stream 能力，同时增加 CAS 风格的 Message 输出与 `SDKClient` 会话对象；对工具输入输出做兼容（接受 CAS 字段别名并返回 CAS 风格字段）。
+**Architecture:** 不新增“外部 wrapper 包”（不做 `claude_agent_sdk` 兼容层），直接在 `openagentic_sdk` 内新增/扩展模块与 API：保留现有 event-stream 能力，同时增加 CAS 风格的 Message 输出与 `SDKClient` 会话对象；对工具输入输出做兼容（接受 CAS 字段别名并返回 CAS 风格字段）。
 
-**Tech Stack:** Python 3.11+，纯标准库（`asyncio/dataclasses/typing/json/pathlib/urllib`），复用现有 `open_agent_sdk.runtime/tools/sessions/hooks/permissions/providers`。
+**Tech Stack:** Python 3.11+，纯标准库（`asyncio/dataclasses/typing/json/pathlib/urllib`），复用现有 `openagentic_sdk.runtime/tools/sessions/hooks/permissions/providers`。
 
 ---
 
-## 0) 现状快照（当前 `open_agent_sdk` 已有）
+## 0) 现状快照（当前 `openagentic_sdk` 已有）
 
 - **运行时**：`AgentRuntime` 支持工具循环、session 持久化（events.jsonl）、`resume`、子代理 `Task`、`SkillActivate`。
 - **Providers**：`OpenAIProvider`（含 SSE streaming）、`OpenAICompatibleProvider`（现已支持 `complete()` + `stream()`）。
@@ -25,7 +25,7 @@
 
 ### A. 顶层 API / 交互模型
 
-- [ ] **CAS 风格 `query()` 输出 Message（content blocks）**：当前 `open_agent_sdk.query()` 输出的是 runtime events（`assistant.delta/tool.use/...`），不是 `AssistantMessage/TextBlock/ResultMessage`。
+- [ ] **CAS 风格 `query()` 输出 Message（content blocks）**：当前 `openagentic_sdk.query()` 输出的是 runtime events（`assistant.delta/tool.use/...`），不是 `AssistantMessage/TextBlock/ResultMessage`。
 - [ ] **长连接会话对象（类似 `ClaudeSDKClient`）**：当前只能用 `resume` 手动续聊，没有 `connect/query/receive_response/interrupt/disconnect` 的 client 形态。
 - [ ] **prompt 支持 AsyncIterable[dict] streaming input**：当前只支持 `prompt: str`。
 - [ ] **interrupts**：当前无中断机制（runtime/provider/tool 侧都没有 abort signal）。
@@ -77,7 +77,7 @@
 
 ### P0（今天优先）：让“CAS 风格使用方式”跑起来（不追求 CLI 兼容）
 
-1) **Message 模型 + CAS 风格 query 输出**（在 `open_agent_sdk` 内实现，不新包）
+1) **Message 模型 + CAS 风格 query 输出**（在 `openagentic_sdk` 内实现，不新包）
 2) **SDKClient：连续会话**（基于 `resume` + session store）
 3) **PermissionMode + can_use_tool（最小可用）**
 4) **HookEvent 基础对齐（至少 PreToolUse/PostToolUse/UserPromptSubmit/Stop）**
@@ -98,17 +98,17 @@
 
 > 说明：下面每个 Task 先写最小 failing test，再补实现；测试框架沿用仓库现有 `unittest`。
 
-### Task 1: 增加 CAS 风格 Message / ContentBlock 类型（open_agent_sdk 内）
+### Task 1: 增加 CAS 风格 Message / ContentBlock 类型（openagentic_sdk 内）
 
 **Files:**
-- Create: `open_agent_sdk/messages.py`
+- Create: `openagentic_sdk/messages.py`
 - Test: `tests/test_messages_blocks.py`
 
 **Step 1: 写 failing test（类型可构造）**
 
 ```python
 import unittest
-from open_agent_sdk.messages import TextBlock, ToolUseBlock, AssistantMessage
+from openagentic_sdk.messages import TextBlock, ToolUseBlock, AssistantMessage
 
 class TestBlocks(unittest.TestCase):
     def test_blocks(self) -> None:
@@ -134,8 +134,8 @@ Expected: FAIL（模块不存在）→ 然后实现 → PASS。
 ### Task 2: 新增 `query_messages()`（或为 `query()` 增加 mode）把 runtime events 映射到 Message
 
 **Files:**
-- Modify: `open_agent_sdk/api.py`
-- Create: `open_agent_sdk/message_query.py`
+- Modify: `openagentic_sdk/api.py`
+- Create: `openagentic_sdk/message_query.py`
 - Test: `tests/test_query_messages_basic.py`
 
 **Step 1: 写 failing test（能产出 ResultMessage）**
@@ -156,8 +156,8 @@ Expected: FAIL（模块不存在）→ 然后实现 → PASS。
 ### Task 3: 增加 `SDKClient`（连续会话 API）
 
 **Files:**
-- Create: `open_agent_sdk/client.py`
-- Modify: `open_agent_sdk/__init__.py`（导出）
+- Create: `openagentic_sdk/client.py`
+- Modify: `openagentic_sdk/__init__.py`（导出）
 - Test: `tests/test_sdk_client_conversation.py`
 
 **Step 1: failing test（两次 query 复用 session_id）**
@@ -182,7 +182,7 @@ client 方法对齐 CAS 文档形态：
 ### Task 4: prompt 支持 AsyncIterable[dict]（streaming input）
 
 **Files:**
-- Modify: `open_agent_sdk/api.py` / `open_agent_sdk/message_query.py` / `open_agent_sdk/client.py`
+- Modify: `openagentic_sdk/api.py` / `openagentic_sdk/message_query.py` / `openagentic_sdk/client.py`
 - Test: `tests/test_prompt_streaming_input.py`
 
 **Step 1: failing test**
@@ -199,9 +199,9 @@ client 方法对齐 CAS 文档形态：
 ### Task 5: Permissions 对齐（PermissionMode + can_use_tool 的返回结构）
 
 **Files:**
-- Create: `open_agent_sdk/permissions/cas.py`
-- Modify: `open_agent_sdk/options.py`
-- Modify: `open_agent_sdk/runtime.py`
+- Create: `openagentic_sdk/permissions/cas.py`
+- Modify: `openagentic_sdk/options.py`
+- Modify: `openagentic_sdk/runtime.py`
 - Test: `tests/test_permissions_modes.py`
 
 **Step 1: failing test（acceptEdits 自动放行 Edit/Write）**
@@ -225,8 +225,8 @@ client 方法对齐 CAS 文档形态：
 ### Task 6: Hooks 对齐（最小：PreToolUse/PostToolUse/UserPromptSubmit/Stop）
 
 **Files:**
-- Create: `open_agent_sdk/hooks/cas.py`
-- Modify: `open_agent_sdk/runtime.py`
+- Create: `openagentic_sdk/hooks/cas.py`
+- Modify: `openagentic_sdk/runtime.py`
 - Test: `tests/test_hooks_user_prompt_submit.py`
 
 **Step 1: failing test（UserPromptSubmit 能改 prompt）**
@@ -243,8 +243,8 @@ client 方法对齐 CAS 文档形态：
 ### Task 7: Interrupt（最小可用）
 
 **Files:**
-- Modify: `open_agent_sdk/runtime.py`
-- Modify: `open_agent_sdk/client.py`
+- Modify: `openagentic_sdk/runtime.py`
+- Modify: `openagentic_sdk/client.py`
 - Test: `tests/test_interrupt_stops_run.py`
 
 **Step 1: failing test（interrupt 后尽快 yield ResultMessage subtype=error/interrupt）**
@@ -260,12 +260,12 @@ client 方法对齐 CAS 文档形态：
 ### Task 8: 工具 I/O 兼容（不改工具名，支持 CAS 字段别名 + CAS 输出字段）
 
 **Files:**
-- Modify: `open_agent_sdk/tools/read.py`
-- Modify: `open_agent_sdk/tools/write.py`
-- Modify: `open_agent_sdk/tools/edit.py`
-- Modify: `open_agent_sdk/tools/bash.py`
-- Modify: `open_agent_sdk/tools/glob.py`
-- Modify: `open_agent_sdk/tools/grep.py`
+- Modify: `openagentic_sdk/tools/read.py`
+- Modify: `openagentic_sdk/tools/write.py`
+- Modify: `openagentic_sdk/tools/edit.py`
+- Modify: `openagentic_sdk/tools/bash.py`
+- Modify: `openagentic_sdk/tools/glob.py`
+- Modify: `openagentic_sdk/tools/grep.py`
 - Test: `tests/test_tools_cas_io_compat.py`
 
 **Step 1: failing tests（逐工具）**
@@ -283,9 +283,9 @@ client 方法对齐 CAS 文档形态：
 ### Task 9: AskUserQuestion（作为模型可调用 tool）
 
 **Files:**
-- Create: `open_agent_sdk/tools/ask_user_question.py`
-- Modify: `open_agent_sdk/tools/defaults.py`
-- Modify: `open_agent_sdk/runtime.py`（special-case：执行时产出 `UserQuestion` 并等待 user_answerer）
+- Create: `openagentic_sdk/tools/ask_user_question.py`
+- Modify: `openagentic_sdk/tools/defaults.py`
+- Modify: `openagentic_sdk/runtime.py`（special-case：执行时产出 `UserQuestion` 并等待 user_answerer）
 - Test: `tests/test_tool_ask_user_question.py`
 
 **Step 1: failing test**
@@ -299,9 +299,9 @@ client 方法对齐 CAS 文档形态：
 ### Task 10: 自定义工具（@tool + SDK MCP server 的最小实现）
 
 **Files:**
-- Create: `open_agent_sdk/mcp/sdk.py`
-- Modify: `open_agent_sdk/options.py`
-- Modify: `open_agent_sdk/tools/registry.py` / `open_agent_sdk/tools/openai.py`
+- Create: `openagentic_sdk/mcp/sdk.py`
+- Modify: `openagentic_sdk/options.py`
+- Modify: `openagentic_sdk/tools/registry.py` / `openagentic_sdk/tools/openai.py`
 - Test: `tests/test_mcp_sdk_tools.py`
 
 **Step 1: failing test**
@@ -321,10 +321,10 @@ client 方法对齐 CAS 文档形态：
 ### Task 11: NotebookEdit + WebFetch(prompt) + WebSearch domain filters（P1）
 
 **Files:**
-- Create: `open_agent_sdk/tools/notebook_edit.py`
-- Modify: `open_agent_sdk/tools/web_fetch.py`
-- Modify: `open_agent_sdk/tools/web_search_tavily.py`
-- Modify: `open_agent_sdk/tools/defaults.py`
+- Create: `openagentic_sdk/tools/notebook_edit.py`
+- Modify: `openagentic_sdk/tools/web_fetch.py`
+- Modify: `openagentic_sdk/tools/web_search_tavily.py`
+- Modify: `openagentic_sdk/tools/defaults.py`
 - Tests: `tests/test_tools_notebook_edit.py`, `tests/test_web_fetch_prompt.py`, `tests/test_web_search_domain_filters.py`
 
 实现策略（最小可用）：
@@ -336,7 +336,7 @@ client 方法对齐 CAS 文档形态：
 
 ## 4) 需要你先 review/拍板的“语义选择”
 
-1) **是否允许引入一个“CAS 风格输出 API”而不改现有 `open_agent_sdk.query()`**  
+1) **是否允许引入一个“CAS 风格输出 API”而不改现有 `openagentic_sdk.query()`**  
    - 方案 A：保留现有 `query()`（events），新增 `query_messages()`（messages）  
    - 方案 B：`query()` 改为 messages，另提供 `query_events()`（可能影响现有用户/测试）
 

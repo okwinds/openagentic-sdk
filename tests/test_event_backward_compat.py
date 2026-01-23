@@ -1,6 +1,6 @@
 import unittest
 
-from open_agent_sdk.serialization import loads_event
+from openagentic_sdk.serialization import loads_event
 
 
 class TestEventBackwardCompat(unittest.TestCase):

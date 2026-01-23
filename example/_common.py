@@ -10,16 +10,16 @@ from typing import Any, Awaitable
 sys.dont_write_bytecode = True
 
 # When running an example directly, Python sets sys.path[0] to `example/`,
-# so `open_agent_sdk` (at repo root) won't be importable unless we add it.
+# so `openagentic_sdk` (at repo root) won't be importable unless we add it.
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from open_agent_sdk.options import OpenAgentOptions  # noqa: E402
-from open_agent_sdk.permissions.gate import PermissionGate  # noqa: E402
-from open_agent_sdk.permissions.interactive import InteractiveApprover  # noqa: E402
-from open_agent_sdk.providers.openai_compatible import OpenAICompatibleProvider  # noqa: E402
-from open_agent_sdk.permissions.gate import Approver, UserAnswerer  # noqa: E402
+from openagentic_sdk.options import OpenAgentOptions  # noqa: E402
+from openagentic_sdk.permissions.gate import PermissionGate  # noqa: E402
+from openagentic_sdk.permissions.interactive import InteractiveApprover  # noqa: E402
+from openagentic_sdk.providers.openai_compatible import OpenAICompatibleProvider  # noqa: E402
+from openagentic_sdk.permissions.gate import Approver, UserAnswerer  # noqa: E402
 
 
 def repo_root() -> Path:
@@ -27,7 +27,7 @@ def repo_root() -> Path:
 
 
 def default_session_root() -> Path:
-    return repo_root() / ".open-agent-sdk"
+    return repo_root() / ".openagentic-sdk"
 
 
 def run_sync(coro: Awaitable[Any]) -> Any:

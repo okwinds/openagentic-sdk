@@ -3,9 +3,9 @@ from __future__ import annotations
 import asyncio
 
 from _common import repo_root, rightcode_options
-from open_agent_sdk.console import ConsoleRenderer, console_client_turn, console_debug_enabled
+from openagentic_sdk.console import ConsoleRenderer, console_client_turn, console_debug_enabled
 
-from open_agent_sdk.client import OpenAgentSDKClient
+from openagentic_sdk.client import OpenAgentSDKClient
 
 
 async def main() -> None:

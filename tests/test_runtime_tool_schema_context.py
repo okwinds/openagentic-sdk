@@ -2,12 +2,12 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.options import OpenAgentOptions
-from open_agent_sdk.permissions.gate import PermissionGate
-from open_agent_sdk.providers.base import ModelOutput
-from open_agent_sdk.sessions.store import FileSessionStore
-from open_agent_sdk.tools.bash import BashTool
-from open_agent_sdk.tools.registry import ToolRegistry
+from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.providers.base import ModelOutput
+from openagentic_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.tools.bash import BashTool
+from openagentic_sdk.tools.registry import ToolRegistry
 
 
 class CaptureToolsProvider:
@@ -41,9 +41,9 @@ class TestRuntimeToolSchemaContext(unittest.IsolatedAsyncioTestCase):
                 session_store=store,
             )
 
-            import open_agent_sdk
+            import openagentic_sdk
 
-            async for _ in open_agent_sdk.query(prompt="hi", options=options):
+            async for _ in openagentic_sdk.query(prompt="hi", options=options):
                 pass
 
             self.assertIsNotNone(provider.captured_tools)

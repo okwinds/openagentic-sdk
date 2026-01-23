@@ -19,7 +19,7 @@ Non-goals for v1:
 
 Add a new package at:
 
-- `packages/sdk/open-agent-sdk/` (pure Python project)
+- `packages/sdk/openagentic-sdk/` (pure Python project)
 
 This keeps incubation close to existing agent/runtime work and matches the repo’s SDK layout, while remaining runtime-independent.
 
@@ -221,7 +221,7 @@ Start with unit tests for:
 
 ## Next Step
 
-Create an implementation plan (phased milestones), then scaffold `packages/sdk/open-agent-sdk/` with:
+Create an implementation plan (phased milestones), then scaffold `packages/sdk/openagentic-sdk/` with:
 
 - `pyproject.toml` (packaging + deps)
 - core modules: `query/run`, events, providers(openai), tool registry, permissions, sessions(file store), hooks

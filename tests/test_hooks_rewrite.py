@@ -1,7 +1,7 @@
 import unittest
 
-from open_agent_sdk.hooks.engine import HookEngine
-from open_agent_sdk.hooks.models import HookDecision, HookMatcher
+from openagentic_sdk.hooks.engine import HookEngine
+from openagentic_sdk.hooks.models import HookDecision, HookMatcher
 
 
 class TestHooks(unittest.IsolatedAsyncioTestCase):

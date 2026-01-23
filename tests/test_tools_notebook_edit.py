@@ -3,8 +3,8 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.tools.base import ToolContext
-from open_agent_sdk.tools.notebook_edit import NotebookEditTool
+from openagentic_sdk.tools.base import ToolContext
+from openagentic_sdk.tools.notebook_edit import NotebookEditTool
 
 
 class TestNotebookEdit(unittest.TestCase):

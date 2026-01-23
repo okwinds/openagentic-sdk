@@ -4,12 +4,12 @@ import asyncio
 import os
 
 from _common import repo_root, rightcode_options
-from open_agent_sdk.client import OpenAgentSDKClient
-from open_agent_sdk.console import ConsoleRenderer, console_client_turn, console_debug_enabled
+from openagentic_sdk.client import OpenAgentSDKClient
+from openagentic_sdk.console import ConsoleRenderer, console_client_turn, console_debug_enabled
 
 
 HELP = """\
-Interactive CLI chat (multi-turn) for open-agent-sdk.
+Interactive CLI chat (multi-turn) for openagentic-sdk.
 
 Commands:
   /help         Show this help
@@ -88,4 +88,3 @@ async def main() -> None:
 
 if __name__ == "__main__":
     asyncio.run(main())
-

@@ -1,6 +1,6 @@
 import unittest
 
-from open_agent_sdk.providers.openai import OpenAIProvider
+from openagentic_sdk.providers.openai import OpenAIProvider
 
 
 def _sse(*payloads: str) -> list[bytes]:

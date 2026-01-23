@@ -4,9 +4,9 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.options import OpenAgentOptions
-from open_agent_sdk.permissions.gate import PermissionGate
-from open_agent_sdk.providers.base import ModelOutput
+from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.providers.base import ModelOutput
 
 
 class _Provider:
@@ -24,8 +24,8 @@ class _TtyStringIO(io.StringIO):
 
 class TestCliReplThinkingHint(unittest.TestCase):
     def test_prints_thinking_hint_before_response(self) -> None:
-        from open_agent_cli.repl import run_chat
-        from open_agent_cli.style import StyleConfig
+        from openagentic_cli.repl import run_chat
+        from openagentic_cli.style import StyleConfig
 
         with TemporaryDirectory() as td:
             opts = OpenAgentOptions(

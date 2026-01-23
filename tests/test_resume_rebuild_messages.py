@@ -2,10 +2,10 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.options import OpenAgentOptions
-from open_agent_sdk.permissions.gate import PermissionGate
-from open_agent_sdk.providers.base import ModelOutput, ToolCall
-from open_agent_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.providers.base import ModelOutput, ToolCall
+from openagentic_sdk.sessions.store import FileSessionStore
 
 
 class FakeProvider:
@@ -43,10 +43,10 @@ class TestResumeRebuild(unittest.IsolatedAsyncioTestCase):
                 session_store=store,
             )
 
-            import open_agent_sdk
+            import openagentic_sdk
 
             events1 = []
-            async for e in open_agent_sdk.query(prompt="read it", options=options1):
+            async for e in openagentic_sdk.query(prompt="read it", options=options1):
                 events1.append(e)
             sid = next(e.session_id for e in events1 if getattr(e, "type", None) == "system.init")
 
@@ -61,7 +61,7 @@ class TestResumeRebuild(unittest.IsolatedAsyncioTestCase):
                 resume=sid,
             )
 
-            async for _ in open_agent_sdk.query(prompt="continue", options=options2):
+            async for _ in openagentic_sdk.query(prompt="continue", options=options2):
                 pass
 
             first = provider2.seen_messages[0]

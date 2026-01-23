@@ -1,7 +1,7 @@
 import unittest
 
-from open_agent_sdk.providers.base import ModelOutput
-from open_agent_sdk.providers.openai_compatible import OpenAICompatibleProvider
+from openagentic_sdk.providers.base import ModelOutput
+from openagentic_sdk.providers.openai_compatible import OpenAICompatibleProvider
 
 
 class TestOpenAICompatibleProvider(unittest.IsolatedAsyncioTestCase):

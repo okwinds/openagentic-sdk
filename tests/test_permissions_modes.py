@@ -1,7 +1,7 @@
 import unittest
 
-from open_agent_sdk.permissions.cas import PermissionResultAllow, PermissionResultDeny
-from open_agent_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.permissions.cas import PermissionResultAllow, PermissionResultDeny
+from openagentic_sdk.permissions.gate import PermissionGate
 
 
 class TestPermissionModes(unittest.IsolatedAsyncioTestCase):

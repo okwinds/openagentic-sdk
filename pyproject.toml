@@ -1,16 +1,26 @@
 [project]
-name = "open-agent-sdk"
-version = "0.0.0"
+name = "openagentic-sdk"
+version = "0.1.0"
 description = "Open-source agent SDK (pure Python)"
 readme = "README.md"
 requires-python = ">=3.11"
+authors = [{ name = "openagentic-sdk contributors" }]
+keywords = ["agent", "cli", "tools", "repl"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Operating System :: OS Independent",
+]
 dependencies = []
 
 [project.scripts]
-oa = "open_agent_cli.__main__:main"
+oa = "openagentic_cli.__main__:main"
 
 [project.optional-dependencies]
-dev = []
+dev = ["build>=1.2.0", "twine>=5.0.0"]
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -21,7 +31,7 @@ package-dir = {"" = "."}
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["open_agent_sdk*", "open_agent_cli*"]
+include = ["openagentic_sdk*", "openagentic_cli*", "open_agent_sdk*", "open_agent_cli*"]
 
 [tool.setuptools.package-data]
-open_agent_sdk = ["tool_prompts/*.txt"]
+openagentic_sdk = ["tool_prompts/*.txt"]

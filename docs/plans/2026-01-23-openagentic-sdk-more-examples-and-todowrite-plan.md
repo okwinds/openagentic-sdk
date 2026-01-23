@@ -6,17 +6,17 @@
 
 **Architecture:** Implement `TodoWrite` as a real tool registered in `default_tool_registry()` with OpenAI tool schema, and handle session persistence in `AgentRuntime._run_tool_call()` by writing `todos.json` under the session dir. Add examples `21_*.py` … `40_*.py` that combine tools (web → summarize → write, notebook generation, TODO workflows, interactive Q&A, restricted tools, etc.) while keeping outputs human-friendly via `EventPrinter`.
 
-**Tech Stack:** Python 3.11+, stdlib only, existing `open_agent_sdk` runtime/tools/sessions/hooks/permissions/providers.
+**Tech Stack:** Python 3.11+, stdlib only, existing `openagentic_sdk` runtime/tools/sessions/hooks/permissions/providers.
 
 ---
 
 ### Task 1: Implement `TodoWrite` tool
 
 **Files:**
-- Create: `open_agent_sdk/tools/todo_write.py`
-- Modify: `open_agent_sdk/tools/defaults.py`
-- Modify: `open_agent_sdk/tools/openai.py`
-- Modify: `open_agent_sdk/runtime.py`
+- Create: `openagentic_sdk/tools/todo_write.py`
+- Modify: `openagentic_sdk/tools/defaults.py`
+- Modify: `openagentic_sdk/tools/openai.py`
+- Modify: `openagentic_sdk/runtime.py`
 
 **Step 1: Write failing test for registry + runtime**
 - Add tests proving:

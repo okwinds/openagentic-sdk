@@ -9,10 +9,11 @@ from dataclasses import replace
 from pathlib import Path
 from typing import TextIO
 
-from open_agent_sdk.options import OpenAgentOptions
-from open_agent_sdk.runtime import AgentRuntime
-from open_agent_sdk.sessions.store import FileSessionStore
-from open_agent_sdk.skills.index import index_skills
+from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.paths import default_session_root
+from openagentic_sdk.runtime import AgentRuntime
+from openagentic_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.skills.index import index_skills
 
 from .permissions import CliPermissionPolicy, build_permission_gate
 from .style import (
@@ -78,9 +79,8 @@ async def run_chat(
     if store is None:
         root = options.session_root
         if root is None:
-            env = os.environ.get("OPEN_AGENT_SDK_HOME")
-            root = os.path.expanduser(env) if env else os.path.join(os.path.expanduser("~"), ".open-agent-sdk")
-        store = FileSessionStore(root_dir=__import__("pathlib").Path(root))
+            root = default_session_root()
+        store = FileSessionStore(root_dir=Path(str(root)).expanduser())
     opts = replace(options, session_store=store)
 
     def _prompt_yes_no(prompt: str) -> bool:

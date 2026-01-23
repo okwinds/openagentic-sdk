@@ -6,8 +6,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from _common import rightcode_options
-from open_agent_sdk.console import ConsoleRenderer, console_debug_enabled, console_query
-from open_agent_sdk.options import AgentDefinition
+from openagentic_sdk.console import ConsoleRenderer, console_debug_enabled, console_query
+from openagentic_sdk.options import AgentDefinition
 
 
 async def main() -> None:

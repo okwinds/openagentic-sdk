@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.skills.index import index_skills
+from openagentic_sdk.skills.index import index_skills
 
 
 class TestSkillIndex(unittest.TestCase):

@@ -28,13 +28,12 @@ from .sessions.store import FileSessionStore
 from .tools.base import ToolContext
 from .tools.openai import tool_schemas_for_openai
 from .mcp.sdk import McpSdkServerConfig, wrap_sdk_server_tools
+from ._version import __version__ as _SDK_VERSION
+from .paths import default_session_root
 
 
 def _default_session_root() -> Path:
-    env = os.environ.get("OPEN_AGENT_SDK_HOME")
-    if env:
-        return Path(env).expanduser()
-    return Path.home() / ".open-agent-sdk"
+    return default_session_root()
 
 
 def _build_project_system_prompt(options: OpenAgentOptions) -> str | None:
@@ -208,7 +207,7 @@ class AgentRuntime:
         init = SystemInit(
             session_id=session_id,
             cwd=options.cwd,
-            sdk_version="0.0.0",
+            sdk_version=_SDK_VERSION,
             parent_tool_use_id=self._parent_tool_use_id,
             agent_name=self._agent_name,
             enabled_tools=options.tools.names(),

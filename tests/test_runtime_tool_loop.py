@@ -3,12 +3,12 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from open_agent_sdk.options import OpenAgentOptions
-from open_agent_sdk.providers.base import ModelOutput, ToolCall
-from open_agent_sdk.sessions.store import FileSessionStore
-from open_agent_sdk.tools.read import ReadTool
-from open_agent_sdk.tools.registry import ToolRegistry
-from open_agent_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.providers.base import ModelOutput, ToolCall
+from openagentic_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.tools.read import ReadTool
+from openagentic_sdk.tools.registry import ToolRegistry
+from openagentic_sdk.permissions.gate import PermissionGate
 
 
 class FakeProvider:
@@ -52,10 +52,10 @@ class TestRuntimeToolLoop(unittest.IsolatedAsyncioTestCase):
                 session_store=store,
             )
 
-            import open_agent_sdk
+            import openagentic_sdk
 
             events = []
-            async for e in open_agent_sdk.query(prompt="read file", options=options):
+            async for e in openagentic_sdk.query(prompt="read file", options=options):
                 events.append(e)
 
             types = [e.type for e in events]

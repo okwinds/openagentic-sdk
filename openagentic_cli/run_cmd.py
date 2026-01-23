@@ -4,8 +4,8 @@ import json
 import sys
 from typing import TextIO
 
-from open_agent_sdk.api import query, run
-from open_agent_sdk.options import OpenAgentOptions
+from openagentic_sdk.api import query, run
+from openagentic_sdk.options import OpenAgentOptions
 
 from .style import InlineCodeHighlighter, StyleConfig, StylizingStream, should_colorize
 from .trace import TraceRenderer

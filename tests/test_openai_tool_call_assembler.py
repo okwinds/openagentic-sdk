@@ -1,6 +1,6 @@
 import unittest
 
-from open_agent_sdk.providers.openai_stream_assembler import ToolCallAssembler
+from openagentic_sdk.providers.openai_stream_assembler import ToolCallAssembler
 
 
 class TestToolCallAssembler(unittest.TestCase):

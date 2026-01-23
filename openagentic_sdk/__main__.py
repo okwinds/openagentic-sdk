@@ -4,7 +4,7 @@ import argparse
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="open-agent-sdk")
+    parser = argparse.ArgumentParser(prog="openagentic-sdk")
     parser.add_argument("--version", action="store_true", help="print version and exit")
     args = parser.parse_args(argv)
     if args.version:
@@ -17,4 +17,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -4,7 +4,7 @@ import os
 
 class TestCliContextHook(unittest.TestCase):
     def test_cli_context_injected_once(self) -> None:
-        from open_agent_cli.config import build_options
+        from openagentic_cli.config import build_options
 
         os.environ["RIGHTCODE_API_KEY"] = "x"
         try:

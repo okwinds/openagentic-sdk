@@ -57,7 +57,7 @@ class BashTool(Tool):
         full_output_file_path: str | None = None
         if (stdout_truncated or stderr_truncated or output_lines_truncated) and ctx.project_dir:
             try:
-                out_dir = Path(ctx.project_dir) / ".open-agent-sdk" / "tool-output"
+                out_dir = Path(ctx.project_dir) / ".openagentic-sdk" / "tool-output"
                 out_dir.mkdir(parents=True, exist_ok=True)
                 out_path = out_dir / f"bash.{uuid.uuid4().hex}.txt"
                 out_path.write_bytes(stdout_full + stderr_full)

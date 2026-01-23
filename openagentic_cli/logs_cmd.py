@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import Counter, deque
 from typing import Iterable
 
-from open_agent_sdk.events import Event
+from openagentic_sdk.events import Event
 
 from .style import StyleConfig, bold, dim, fg_green, fg_red, should_colorize
 

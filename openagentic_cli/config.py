@@ -5,12 +5,12 @@ from pathlib import Path
 from typing import Sequence
 import sys
 
-from open_agent_sdk.hooks.engine import HookEngine
-from open_agent_sdk.hooks.models import HookDecision, HookMatcher
-from open_agent_sdk.options import OpenAgentOptions
-from open_agent_sdk.permissions.gate import PermissionGate
-from open_agent_sdk.permissions.interactive import InteractiveApprover
-from open_agent_sdk.providers.openai_compatible import OpenAICompatibleProvider
+from openagentic_sdk.hooks.engine import HookEngine
+from openagentic_sdk.hooks.models import HookDecision, HookMatcher
+from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.permissions.gate import PermissionGate
+from openagentic_sdk.permissions.interactive import InteractiveApprover
+from openagentic_sdk.providers.openai_compatible import OpenAICompatibleProvider
 
 
 def require_env(name: str) -> str:

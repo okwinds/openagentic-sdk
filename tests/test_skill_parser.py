@@ -1,6 +1,6 @@
 import unittest
 
-from open_agent_sdk.skills.parse import parse_skill_markdown
+from openagentic_sdk.skills.parse import parse_skill_markdown
 
 
 SKILL_MD = """# skill-example
