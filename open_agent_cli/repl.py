@@ -6,6 +6,7 @@ import re
 import shutil
 import sys
 from dataclasses import replace
+from pathlib import Path
 from typing import TextIO
 
 from open_agent_sdk.options import OpenAgentOptions
@@ -13,6 +14,7 @@ from open_agent_sdk.runtime import AgentRuntime
 from open_agent_sdk.sessions.store import FileSessionStore
 from open_agent_sdk.skills.index import index_skills
 
+from .permissions import CliPermissionPolicy, build_permission_gate
 from .style import (
     ANSI_BG_GRAY,
     ANSI_FG_DEFAULT,
@@ -80,6 +82,26 @@ async def run_chat(
             root = os.path.expanduser(env) if env else os.path.join(os.path.expanduser("~"), ".open-agent-sdk")
         store = FileSessionStore(root_dir=__import__("pathlib").Path(root))
     opts = replace(options, session_store=store)
+
+    def _prompt_yes_no(prompt: str) -> bool:
+        stdout.write(prompt)
+        stdout.flush()
+        ans = stdin.readline()
+        return str(ans).strip().lower() in ("y", "yes")
+
+    stdin_is_tty = bool(getattr(stdin, "isatty", lambda: False)())
+    if is_tty and stdin_is_tty:
+        base = Path(opts.cwd)
+        auto_prompt = f"Auto-approve Write/Edit/Bash within `{base}` (and subdirs) for this chat session? [y/N] "
+        auto_allow = _prompt_yes_no(auto_prompt)
+        policy = CliPermissionPolicy(
+            cwd=base,
+            auto_root=base,
+            auto_allow_dangerous=auto_allow,
+            prompt_fn=_prompt_yes_no,
+        )
+        opts = replace(opts, permission_gate=build_permission_gate(policy))
+
     session_id = opts.resume
     current_abort_event: asyncio.Event | None = None
 
