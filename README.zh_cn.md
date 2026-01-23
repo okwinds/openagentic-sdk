@@ -23,6 +23,12 @@
 
 `pip install -e .`
 
+设置环境变量（示例与 CLI 默认使用 RIGHTCODE）：
+
+- `RIGHTCODE_API_KEY`（必需）
+- `RIGHTCODE_BASE_URL`（可选，默认 `https://www.right.codes/codex/v1`）
+- `RIGHTCODE_MODEL`（可选，默认 `gpt-5.2`）
+
 跑测试：
 
 `python -m unittest -q`
@@ -31,6 +37,21 @@
 
 - `python example/01_run_basic.py`
 - 完整列表见 `example/README.md`
+
+## `oa` 命令行（CLI）
+
+安装（可编辑模式）：
+
+`pip install -e .`
+
+常用命令：
+
+- `oa chat`（多轮 REPL，输入 `/help` 查看内置 slash commands）
+- `oa run "prompt"`（支持 `--json`、`--no-stream`）
+- `oa resume <session_id>`（等价于 `oa chat --resume <session_id>`）
+- `oa logs <session_id>`（汇总 `events.jsonl`）
+
+默认会话目录为 `~/.open-agent-sdk`（可用 `OPEN_AGENT_SDK_HOME` 覆盖）。
 
 示例默认需要环境变量（至少要有 `RIGHTCODE_API_KEY`）。在 PowerShell 下可以这样检查：
 
@@ -87,4 +108,3 @@
 推荐先跑一个交互式 CLI 多轮示例（几乎能覆盖常用 tools）：
 
 - `python example/45_cli_chat.py`
-

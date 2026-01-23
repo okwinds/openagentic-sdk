@@ -6,6 +6,9 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []
 
+[project.scripts]
+oa = "open_agent_cli.__main__:main"
+
 [project.optional-dependencies]
 dev = []
 
@@ -18,7 +21,7 @@ package-dir = {"" = "."}
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["open_agent_sdk*"]
+include = ["open_agent_sdk*", "open_agent_cli*"]
 
 [tool.setuptools.package-data]
 open_agent_sdk = ["tool_prompts/*.txt"]

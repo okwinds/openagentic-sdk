@@ -26,6 +26,12 @@ Install (optional, for editable dev):
 
 `pip install -e .`
 
+Set env (examples + CLI default to RIGHTCODE):
+
+- `RIGHTCODE_API_KEY` (required)
+- `RIGHTCODE_BASE_URL` (optional, default `https://www.right.codes/codex/v1`)
+- `RIGHTCODE_MODEL` (optional, default `gpt-5.2`)
+
 Run unit tests:
 
 `python3 -m unittest -q`
@@ -34,6 +40,21 @@ Run examples:
 
 - `python3 example/01_run_basic.py`
 - See `example/README.md` for the full list and required env vars.
+
+## `oa` CLI
+
+Install (editable):
+
+`pip install -e .`
+
+Commands:
+
+- `oa chat` (multi-turn REPL; `/help` for slash commands)
+- `oa run "prompt"` (`--json`, `--no-stream`)
+- `oa resume <session_id>` (alias of `oa chat --resume <session_id>`)
+- `oa logs <session_id>` (summarize `events.jsonl`)
+
+Sessions are stored under `~/.open-agent-sdk` by default (override with `OPEN_AGENT_SDK_HOME`).
 
 ## Usage
 
