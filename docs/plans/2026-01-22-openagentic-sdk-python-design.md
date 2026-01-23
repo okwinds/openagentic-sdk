@@ -13,7 +13,7 @@ Priority: strong built-in capability (tools + approvals + skills) and a provider
 Non-goals for v1:
 
 - MCP execution (leave **API + docs placeholders**; implement later).
-- Perfect 1:1 type names with CAS (e.g., `OpenAgentOptions` instead of `ClaudeAgentOptions`).
+- Perfect 1:1 type names with CAS (e.g., `OpenAgenticOptions` instead of `ClaudeAgentOptions`).
 
 ## Location (monorepo incubation)
 
@@ -55,7 +55,7 @@ Two entry points:
 ```py
 async for event in query(
     prompt="Find and fix the bug in auth.py",
-    options=OpenAgentOptions(
+    options=OpenAgenticOptions(
         provider="openai",
         model="gpt-4.1-mini",
         allowed_tools=["Read", "Edit", "Bash", "Glob", "Grep"],
@@ -86,7 +86,7 @@ Minimum event types:
 
 Subagent events include `parent_tool_use_id` to associate with the triggering `Task` tool call.
 
-## Options (`OpenAgentOptions`)
+## Options (`OpenAgenticOptions`)
 
 Representative fields:
 
@@ -206,7 +206,7 @@ V1 ordering:
 
 No implementation in v1, but reserve:
 
-- `OpenAgentOptions.mcp_servers` / `mcp_registry` fields.
+- `OpenAgenticOptions.mcp_servers` / `mcp_registry` fields.
 - A `MCP` section in docs that explains planned transport support (stdio/HTTP/SSE), auth, and tool surface.
 
 ## Testing Strategy

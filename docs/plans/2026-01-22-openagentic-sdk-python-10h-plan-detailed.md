@@ -276,7 +276,7 @@ Expected: 无输出
 
 **Step 1（test，fail）**：构造大量 events，验证 `resume_max_events` 生效且不会 OOM。
 
-**Step 2（impl）**：在 `OpenAgentOptions` 增加：
+**Step 2（impl）**：在 `OpenAgenticOptions` 增加：
 - `resume_max_events: int = 1000`
 - `resume_max_bytes: int = ...`
 
@@ -663,7 +663,7 @@ Expected: 无输出
 **Step 1（test，fail）**：
 - child agent tools=("Read",) 时，调用 Bash 必须 ToolNotAllowed/PermissionDenied
 
-**Step 2（impl）**：在 child OpenAgentOptions 构造时强制 allowed_tools=definition.tools
+**Step 2（impl）**：在 child OpenAgenticOptions 构造时强制 allowed_tools=definition.tools
 
 **Step 3（test，pass）**
 

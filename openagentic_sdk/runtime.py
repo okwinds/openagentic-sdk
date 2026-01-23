@@ -19,7 +19,7 @@ from .events import (
     UserQuestion,
 )
 from .hooks.engine import HookEngine
-from .options import OpenAgentOptions
+from .options import OpenAgenticOptions
 from .providers.base import ModelOutput, ToolCall
 from .project.claude import load_claude_project_settings
 from .skills.index import index_skills
@@ -36,7 +36,7 @@ def _default_session_root() -> Path:
     return default_session_root()
 
 
-def _build_project_system_prompt(options: OpenAgentOptions) -> str | None:
+def _build_project_system_prompt(options: OpenAgenticOptions) -> str | None:
     if "project" not in set(options.setting_sources):
         return None
     project_dir = options.project_dir or options.cwd
@@ -77,7 +77,7 @@ _LIST_SKILLS_RE = re.compile(
 )
 
 
-def _maybe_expand_execute_skill_prompt(prompt: str, options: OpenAgentOptions) -> str:
+def _maybe_expand_execute_skill_prompt(prompt: str, options: OpenAgenticOptions) -> str:
     """
     Best-effort helper for users who type "执行技能<name>" expecting an automatic skill run.
 
@@ -114,7 +114,7 @@ def _maybe_expand_execute_skill_prompt(prompt: str, options: OpenAgentOptions) -
     )
 
 
-def _maybe_expand_list_skills_prompt(prompt: str, options: OpenAgentOptions) -> str:
+def _maybe_expand_list_skills_prompt(prompt: str, options: OpenAgenticOptions) -> str:
     """
     Best-effort helper for users who ask to list available skills without explicitly naming the tool.
     """
@@ -157,7 +157,7 @@ class RunResult:
 
 
 class AgentRuntime:
-    def __init__(self, options: OpenAgentOptions, *, agent_name: str | None = None, parent_tool_use_id: str | None = None):
+    def __init__(self, options: OpenAgenticOptions, *, agent_name: str | None = None, parent_tool_use_id: str | None = None):
         self._options = options
         self._agent_name = agent_name
         self._parent_tool_use_id = parent_tool_use_id
@@ -742,7 +742,7 @@ class AgentRuntime:
                     "agent_name": agent,
                 }
             )
-            child_options = OpenAgentOptions(
+            child_options = OpenAgenticOptions(
                 provider=definition.provider or options.provider,
                 model=definition.model or options.model,
                 api_key=options.api_key,

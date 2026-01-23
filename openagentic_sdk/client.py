@@ -9,7 +9,7 @@ from typing import Any, AsyncIterable, AsyncIterator
 
 from .message_query import query_messages
 from .messages import Message, ResultMessage
-from .options import OpenAgentOptions
+from .options import OpenAgenticOptions
 from .prompting import coerce_prompt
 from .paths import default_session_root
 from .sessions.store import FileSessionStore
@@ -20,7 +20,7 @@ def _default_session_root() -> Path:
 
 
 class OpenAgentSDKClient:
-    def __init__(self, options: OpenAgentOptions | None = None) -> None:
+    def __init__(self, options: OpenAgenticOptions | None = None) -> None:
         self._base_options = options
         self._store: FileSessionStore | None = None
         self._session_id: str | None = None

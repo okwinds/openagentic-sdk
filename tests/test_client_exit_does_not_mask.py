@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from openagentic_sdk.client import OpenAgentSDKClient
-from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.options import OpenAgenticOptions
 from openagentic_sdk.permissions.gate import PermissionGate
 from openagentic_sdk.providers.base import ModelOutput
 from openagentic_sdk.sessions.store import FileSessionStore
@@ -22,7 +22,7 @@ class TestClientExitDoesNotMask(unittest.IsolatedAsyncioTestCase):
         with TemporaryDirectory() as td:
             root = Path(td)
             store = FileSessionStore(root_dir=root)
-            options = OpenAgentOptions(
+            options = OpenAgenticOptions(
                 provider=ExplodingProvider(),
                 model="fake",
                 api_key="x",

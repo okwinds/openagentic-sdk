@@ -22,7 +22,7 @@
 - `StepStreamingProvider` for deterministic `stream()` sequences.
 
 **Step 3:** Add helpers to:
-- Build `OpenAgentOptions` with a default `.openagentic-sdk` session root under repo.
+- Build `OpenAgenticOptions` with a default `.openagentic-sdk` session root under repo.
 - Parse tool outputs from provider-native `tool` messages.
 
 ---

@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.options import OpenAgenticOptions
 from openagentic_sdk.permissions.gate import PermissionGate
 from openagentic_sdk.providers.base import ModelOutput, ToolCall
 from openagentic_sdk.sessions.store import FileSessionStore
@@ -41,7 +41,7 @@ class TestSkillActivateResume(unittest.IsolatedAsyncioTestCase):
             (skill_dir / "SKILL.md").write_text("# ex\n\nsummary\n", encoding="utf-8")
 
             store = FileSessionStore(root_dir=root)
-            options1 = OpenAgentOptions(
+            options1 = OpenAgenticOptions(
                 provider=ActivateProvider(),
                 model="m",
                 api_key="x",
@@ -59,7 +59,7 @@ class TestSkillActivateResume(unittest.IsolatedAsyncioTestCase):
             sid = next(e.session_id for e in events if getattr(e, "type", None) == "system.init")
 
             rp = RecordingProvider()
-            options2 = OpenAgentOptions(
+            options2 = OpenAgenticOptions(
                 provider=rp,
                 model="m",
                 api_key="x",

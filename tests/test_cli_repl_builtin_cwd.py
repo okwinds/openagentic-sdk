@@ -2,7 +2,7 @@ import asyncio
 import io
 import unittest
 
-from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.options import OpenAgenticOptions
 from openagentic_sdk.permissions.gate import PermissionGate
 from openagentic_sdk.providers.openai_compatible import OpenAICompatibleProvider
 
@@ -17,7 +17,7 @@ class TestCliReplBuiltinCwd(unittest.TestCase):
         from openagentic_cli.repl import run_chat
         from openagentic_cli.style import StyleConfig
 
-        opts = OpenAgentOptions(
+        opts = OpenAgenticOptions(
             provider=OpenAICompatibleProvider(base_url="https://example.invalid"),
             model="gpt-5.2",
             api_key=None,

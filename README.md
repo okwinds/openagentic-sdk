@@ -73,13 +73,13 @@ Streaming:
 
 ```py
 import asyncio
-from openagentic_sdk import OpenAgentOptions, query
+from openagentic_sdk import OpenAgenticOptions, query
 from openagentic_sdk.providers import OpenAIProvider
 from openagentic_sdk.permissions import PermissionGate
 
 
 async def main() -> None:
-    options = OpenAgentOptions(
+    options = OpenAgenticOptions(
         provider=OpenAIProvider(),
         model="gpt-4.1-mini",
         api_key="...",  # OpenAI API key
@@ -98,13 +98,13 @@ One-shot:
 
 ```py
 import asyncio
-from openagentic_sdk import OpenAgentOptions, run
+from openagentic_sdk import OpenAgenticOptions, run
 from openagentic_sdk.providers import OpenAIProvider
 from openagentic_sdk.permissions import PermissionGate
 
 
 async def main() -> None:
-    options = OpenAgentOptions(
+    options = OpenAgenticOptions(
         provider=OpenAIProvider(),
         model="gpt-4.1-mini",
         api_key="...",
@@ -120,11 +120,11 @@ asyncio.run(main())
 OpenAI-compatible backend (the examples default to RIGHTCODE):
 
 ```py
-from openagentic_sdk import OpenAgentOptions, run
+from openagentic_sdk import OpenAgenticOptions, run
 from openagentic_sdk.providers.openai_compatible import OpenAICompatibleProvider
 from openagentic_sdk.permissions import PermissionGate
 
-options = OpenAgentOptions(
+options = OpenAgenticOptions(
     provider=OpenAICompatibleProvider(base_url="https://www.right.codes/codex/v1"),
     model="gpt-5.2",
     api_key="...",  # RIGHTCODE_API_KEY

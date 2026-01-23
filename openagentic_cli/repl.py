@@ -9,7 +9,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import TextIO
 
-from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.options import OpenAgenticOptions
 from openagentic_sdk.paths import default_session_root
 from openagentic_sdk.runtime import AgentRuntime
 from openagentic_sdk.sessions.store import FileSessionStore
@@ -59,7 +59,7 @@ _CWD_QUESTION_RE = re.compile(
 
 
 async def run_chat(
-    options: OpenAgentOptions,
+    options: OpenAgenticOptions,
     *,
     color_config: StyleConfig,
     debug: bool,

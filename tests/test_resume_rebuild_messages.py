@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.options import OpenAgenticOptions
 from openagentic_sdk.permissions.gate import PermissionGate
 from openagentic_sdk.providers.base import ModelOutput, ToolCall
 from openagentic_sdk.sessions.store import FileSessionStore
@@ -34,7 +34,7 @@ class TestResumeRebuild(unittest.IsolatedAsyncioTestCase):
             store = FileSessionStore(root_dir=root)
 
             provider1 = FakeProvider()
-            options1 = OpenAgentOptions(
+            options1 = OpenAgenticOptions(
                 provider=provider1,
                 model="fake",
                 api_key="x",
@@ -51,7 +51,7 @@ class TestResumeRebuild(unittest.IsolatedAsyncioTestCase):
             sid = next(e.session_id for e in events1 if getattr(e, "type", None) == "system.init")
 
             provider2 = FakeProvider()
-            options2 = OpenAgentOptions(
+            options2 = OpenAgenticOptions(
                 provider=provider2,
                 model="fake",
                 api_key="x",

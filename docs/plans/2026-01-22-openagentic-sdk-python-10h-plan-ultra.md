@@ -463,7 +463,7 @@ from tempfile import TemporaryDirectory
 
 from openagentic_sdk.hooks.engine import HookEngine
 from openagentic_sdk.hooks.models import HookDecision, HookMatcher
-from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.options import OpenAgenticOptions
 from openagentic_sdk.permissions.gate import PermissionGate
 from openagentic_sdk.providers.base import ModelOutput
 from openagentic_sdk.sessions.store import FileSessionStore
@@ -488,7 +488,7 @@ class TestHooksModelPoints(unittest.IsolatedAsyncioTestCase):
         with TemporaryDirectory() as td:
             root = Path(td)
             store = FileSessionStore(root_dir=root)
-            options = OpenAgentOptions(
+            options = OpenAgenticOptions(
                 provider=NoopProvider(),
                 model="m",
                 api_key="x",
@@ -1206,7 +1206,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.options import OpenAgenticOptions
 from openagentic_sdk.permissions.gate import PermissionGate
 from openagentic_sdk.sessions.store import FileSessionStore
 
@@ -1225,7 +1225,7 @@ class TestRuntimeStreaming(unittest.IsolatedAsyncioTestCase):
         with TemporaryDirectory() as td:
             root = Path(td)
             store = FileSessionStore(root_dir=root)
-            options = OpenAgentOptions(
+            options = OpenAgenticOptions(
                 provider=FakeStreamingProvider(),
                 model="m",
                 api_key="x",
@@ -1443,7 +1443,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.options import OpenAgenticOptions
 from openagentic_sdk.permissions.gate import PermissionGate
 from openagentic_sdk.providers.base import ModelOutput
 from openagentic_sdk.sessions.store import FileSessionStore
@@ -1474,7 +1474,7 @@ class TestRuntimeSkillInjection(unittest.IsolatedAsyncioTestCase):
 
             store = FileSessionStore(root_dir=root)
             provider = RecordingProvider()
-            options = OpenAgentOptions(
+            options = OpenAgenticOptions(
                 provider=provider,
                 model="m",
                 api_key="x",
@@ -1569,7 +1569,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.options import OpenAgenticOptions
 from openagentic_sdk.permissions.gate import PermissionGate
 from openagentic_sdk.providers.base import ModelOutput, ToolCall
 from openagentic_sdk.sessions.store import FileSessionStore
@@ -1604,7 +1604,7 @@ class TestSkillE2E(unittest.IsolatedAsyncioTestCase):
             (p / "SKILL.md").write_text("# check\n\nFind TODOs.\n\n## Checklist\n- Use Grep\n", encoding="utf-8")
 
             store = FileSessionStore(root_dir=root)
-            options = OpenAgentOptions(
+            options = OpenAgenticOptions(
                 provider=ScriptedProvider(),
                 model="m",
                 api_key="x",
@@ -1753,7 +1753,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.options import OpenAgenticOptions
 from openagentic_sdk.providers.base import ModelOutput
 from openagentic_sdk.permissions.gate import PermissionGate
 from openagentic_sdk.sessions.store import FileSessionStore
@@ -1771,7 +1771,7 @@ class TestSessionMeta(unittest.IsolatedAsyncioTestCase):
         with TemporaryDirectory() as td:
             root = Path(td)
             store = FileSessionStore(root_dir=root)
-            options = OpenAgentOptions(
+            options = OpenAgenticOptions(
                 provider=NoopProvider(),
                 model="m",
                 api_key="x",
@@ -1833,7 +1833,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from openagentic_sdk.options import AgentDefinition, OpenAgentOptions
+from openagentic_sdk.options import AgentDefinition, OpenAgenticOptions
 from openagentic_sdk.permissions.gate import PermissionGate
 from openagentic_sdk.providers.base import ModelOutput, ToolCall
 from openagentic_sdk.sessions.store import FileSessionStore
@@ -1861,7 +1861,7 @@ class TestSessionLink(unittest.IsolatedAsyncioTestCase):
         with TemporaryDirectory() as td:
             root = Path(td)
             store = FileSessionStore(root_dir=root)
-            options = OpenAgentOptions(
+            options = OpenAgenticOptions(
                 provider=TaskProvider(),
                 model="m",
                 api_key="x",
@@ -1989,7 +1989,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.options import OpenAgenticOptions
 from openagentic_sdk.permissions.gate import PermissionGate
 from openagentic_sdk.providers.base import ModelOutput, ToolCall
 from openagentic_sdk.sessions.store import FileSessionStore
@@ -2010,7 +2010,7 @@ class TestAskUserQuestion(unittest.IsolatedAsyncioTestCase):
             async def answerer(q):
                 return "yes"
 
-            options = OpenAgentOptions(
+            options = OpenAgenticOptions(
                 provider=ProviderAsksTool(),
                 model="m",
                 api_key="x",
@@ -2079,7 +2079,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.options import OpenAgenticOptions
 from openagentic_sdk.providers.base import ModelOutput, ToolCall
 from openagentic_sdk.permissions.gate import PermissionGate
 from openagentic_sdk.sessions.store import FileSessionStore
@@ -2110,7 +2110,7 @@ class TestResumeRebuild(unittest.IsolatedAsyncioTestCase):
             store = FileSessionStore(root_dir=root)
 
             provider1 = FakeProvider()
-            options1 = OpenAgentOptions(
+            options1 = OpenAgenticOptions(
                 provider=provider1,
                 model="fake",
                 api_key="x",
@@ -2127,7 +2127,7 @@ class TestResumeRebuild(unittest.IsolatedAsyncioTestCase):
             sid = next(e.session_id for e in events1 if getattr(e, "type", None) == "system.init")
 
             provider2 = FakeProvider()
-            options2 = OpenAgentOptions(
+            options2 = OpenAgenticOptions(
                 provider=provider2,
                 model="fake",
                 api_key="x",
@@ -2231,7 +2231,7 @@ if __name__ == "__main__":
 
 **Step 2: impl**
 
-- `OpenAgentOptions` 增加：
+- `OpenAgenticOptions` 增加：
   - `resume_max_events: int = 1000`
   - `resume_max_bytes: int = 2_000_000`
 - `rebuild_messages` 先截断 events 再 rebuild

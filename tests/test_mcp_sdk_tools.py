@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from openagentic_sdk import OpenAgentOptions, create_sdk_mcp_server, tool
+from openagentic_sdk import OpenAgenticOptions, create_sdk_mcp_server, tool
 from openagentic_sdk.permissions.gate import PermissionGate
 from openagentic_sdk.providers.base import ModelOutput, ToolCall
 from openagentic_sdk.sessions.store import FileSessionStore
@@ -47,7 +47,7 @@ class TestMcpSdkTools(unittest.IsolatedAsyncioTestCase):
             root = Path(td)
             store = FileSessionStore(root_dir=root)
             server = create_sdk_mcp_server(name="calculator", version="1.0.0", tools=[add])
-            options = OpenAgentOptions(
+            options = OpenAgenticOptions(
                 provider=FakeProvider(),
                 model="m",
                 api_key="x",

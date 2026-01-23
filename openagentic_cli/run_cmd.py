@@ -5,7 +5,7 @@ import sys
 from typing import TextIO
 
 from openagentic_sdk.api import query, run
-from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.options import OpenAgenticOptions
 
 from .style import InlineCodeHighlighter, StyleConfig, StylizingStream, should_colorize
 from .trace import TraceRenderer
@@ -23,7 +23,7 @@ def format_run_json(*, final_text: str, session_id: str, stop_reason: str | None
 
 
 async def run_once(
-    options: OpenAgentOptions,
+    options: OpenAgenticOptions,
     prompt: str,
     *,
     stream: bool,

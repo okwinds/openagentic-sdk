@@ -23,7 +23,7 @@ class AgentDefinition:
 
 
 @dataclass(frozen=True, slots=True)
-class OpenAgentOptions:
+class OpenAgenticOptions:
     provider: Provider
     model: str
     api_key: str | None = None

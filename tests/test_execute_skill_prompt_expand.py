@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 
 class TestExecuteSkillPromptExpand(unittest.TestCase):
     def test_expands_execute_skill_prompt_when_skill_exists(self) -> None:
-        from openagentic_sdk.options import OpenAgentOptions
+        from openagentic_sdk.options import OpenAgenticOptions
         from openagentic_sdk.providers.openai_compatible import OpenAICompatibleProvider
         from openagentic_sdk.runtime import _maybe_expand_execute_skill_prompt
 
@@ -15,7 +15,7 @@ class TestExecuteSkillPromptExpand(unittest.TestCase):
             skill_dir.mkdir(parents=True)
             (skill_dir / "SKILL.md").write_text("---\nname: main-process\n---\n\n# Main Process\n\n## Workflow\n- x\n", encoding="utf-8")
 
-            opts = OpenAgentOptions(
+            opts = OpenAgenticOptions(
                 provider=OpenAICompatibleProvider(),
                 model="m",
                 api_key="k",
@@ -28,15 +28,15 @@ class TestExecuteSkillPromptExpand(unittest.TestCase):
             self.assertIn("name: main-process", out)
 
     def test_does_not_expand_other_prompts(self) -> None:
-        from openagentic_sdk.options import OpenAgentOptions
+        from openagentic_sdk.options import OpenAgenticOptions
         from openagentic_sdk.providers.openai_compatible import OpenAICompatibleProvider
         from openagentic_sdk.runtime import _maybe_expand_execute_skill_prompt
 
-        opts = OpenAgentOptions(provider=OpenAICompatibleProvider(), model="m", api_key="k", cwd=".")
+        opts = OpenAgenticOptions(provider=OpenAICompatibleProvider(), model="m", api_key="k", cwd=".")
         self.assertEqual(_maybe_expand_execute_skill_prompt("hello", opts), "hello")
 
     def test_expands_list_skills_prompt_when_skills_exist(self) -> None:
-        from openagentic_sdk.options import OpenAgentOptions
+        from openagentic_sdk.options import OpenAgenticOptions
         from openagentic_sdk.providers.openai_compatible import OpenAICompatibleProvider
         from openagentic_sdk.runtime import _maybe_expand_list_skills_prompt
 
@@ -45,7 +45,7 @@ class TestExecuteSkillPromptExpand(unittest.TestCase):
             p = root / ".claude" / "skills" / "a"
             p.mkdir(parents=True)
             (p / "SKILL.md").write_text("---\nname: a\ndescription: desc\n---\n\n# A\n", encoding="utf-8")
-            opts = OpenAgentOptions(
+            opts = OpenAgenticOptions(
                 provider=OpenAICompatibleProvider(),
                 model="m",
                 api_key="k",

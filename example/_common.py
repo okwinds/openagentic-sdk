@@ -15,7 +15,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from openagentic_sdk.options import OpenAgentOptions  # noqa: E402
+from openagentic_sdk.options import OpenAgenticOptions  # noqa: E402
 from openagentic_sdk.permissions.gate import PermissionGate  # noqa: E402
 from openagentic_sdk.permissions.interactive import InteractiveApprover  # noqa: E402
 from openagentic_sdk.providers.openai_compatible import OpenAICompatibleProvider  # noqa: E402
@@ -87,10 +87,10 @@ def rightcode_options(
     interactive: bool = True,
     approver: Approver | None = None,
     user_answerer: UserAnswerer | None = None,
-    ) -> OpenAgentOptions:
+    ) -> OpenAgenticOptions:
     api_key = require_env("RIGHTCODE_API_KEY")
     model = os.environ.get("RIGHTCODE_MODEL", "gpt-5.2")
-    return OpenAgentOptions(
+    return OpenAgenticOptions(
         provider=rightcode_provider(),
         model=model,
         api_key=api_key,

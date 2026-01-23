@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.options import OpenAgenticOptions
 from openagentic_sdk.permissions.gate import PermissionGate
 from openagentic_sdk.providers.base import ModelOutput
 
@@ -28,7 +28,7 @@ class TestCliReplThinkingHint(unittest.TestCase):
         from openagentic_cli.style import StyleConfig
 
         with TemporaryDirectory() as td:
-            opts = OpenAgentOptions(
+            opts = OpenAgenticOptions(
                 provider=_Provider(),
                 model="gpt-5.2",
                 api_key=None,

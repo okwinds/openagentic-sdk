@@ -5,14 +5,14 @@ from typing import Any
 from ..api import query, query_messages, run
 from ..client import OpenAgentSDKClient
 from ..messages import ResultMessage
-from ..options import OpenAgentOptions
+from ..options import OpenAgenticOptions
 from .renderer import ConsoleRenderer, console_debug_enabled
 
 
 async def console_run(
     *,
     prompt: str,
-    options: OpenAgentOptions,
+    options: OpenAgenticOptions,
     debug: bool | None = None,
 ) -> Any:
     dbg = console_debug_enabled() if debug is None else bool(debug)
@@ -27,7 +27,7 @@ async def console_run(
 async def console_query(
     *,
     prompt: str,
-    options: OpenAgentOptions,
+    options: OpenAgenticOptions,
     renderer: ConsoleRenderer | None = None,
 ) -> None:
     r = renderer or ConsoleRenderer(debug=console_debug_enabled())
@@ -43,7 +43,7 @@ async def console_query(
 async def console_query_messages(
     *,
     prompt: str,
-    options: OpenAgentOptions,
+    options: OpenAgenticOptions,
     renderer: ConsoleRenderer | None = None,
 ) -> None:
     r = renderer or ConsoleRenderer(debug=console_debug_enabled())

@@ -7,7 +7,7 @@ from typing import Any, AsyncIterator
 
 from .events import AssistantDelta, AssistantMessage as EventAssistantMessage, Result as EventResult, SystemInit, ToolResult, ToolUse
 from .messages import AssistantMessage, Message, ResultMessage, StreamEvent, SystemMessage, TextBlock, ToolResultBlock, ToolUseBlock
-from .options import OpenAgentOptions
+from .options import OpenAgenticOptions
 from .runtime import AgentRuntime
 
 
@@ -22,7 +22,7 @@ def _stringify_tool_output(output: Any) -> str | None:
         return str(output)
 
 
-async def query_messages(*, prompt: str, options: OpenAgentOptions) -> AsyncIterator[Message]:
+async def query_messages(*, prompt: str, options: OpenAgenticOptions) -> AsyncIterator[Message]:
     started = time.time()
     runtime = AgentRuntime(options)
 

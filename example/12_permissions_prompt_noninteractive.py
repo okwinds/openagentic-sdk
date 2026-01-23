@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 
 from _common import rightcode_options
 from openagentic_sdk.console import ConsoleRenderer, console_debug_enabled, console_query
-from openagentic_sdk import OpenAgentOptions
+from openagentic_sdk import OpenAgenticOptions
 from openagentic_sdk.events import UserQuestion
 from openagentic_sdk.permissions.gate import PermissionGate
 
@@ -20,7 +20,7 @@ async def _run_case(*, root: Path, label: str, gate: PermissionGate) -> None:
     print()
     print(f"=== {label} ===")
     base = rightcode_options(cwd=root, project_dir=root, allowed_tools=["Read"], interactive=False)
-    options = OpenAgentOptions(
+    options = OpenAgenticOptions(
         provider=base.provider,
         model=base.model,
         api_key=base.api_key,

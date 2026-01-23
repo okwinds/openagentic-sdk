@@ -5,7 +5,7 @@ from pathlib import Path
 
 class TestProjectSystemPromptSkills(unittest.TestCase):
     def test_system_prompt_includes_execute_skill_rule(self) -> None:
-        from openagentic_sdk.options import OpenAgentOptions
+        from openagentic_sdk.options import OpenAgenticOptions
         from openagentic_sdk.providers.openai_compatible import OpenAICompatibleProvider
         from openagentic_sdk.runtime import _build_project_system_prompt
 
@@ -16,7 +16,7 @@ class TestProjectSystemPromptSkills(unittest.TestCase):
                 "---\nname: demo\n---\n\n# Demo\n",
                 encoding="utf-8",
             )
-            opts = OpenAgentOptions(
+            opts = OpenAgenticOptions(
                 provider=OpenAICompatibleProvider(),
                 model="m",
                 api_key="k",

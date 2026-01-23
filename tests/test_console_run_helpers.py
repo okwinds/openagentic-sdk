@@ -6,10 +6,10 @@ class TestConsoleRunHelpers(unittest.TestCase):
     def test_console_query_non_debug_exits_cleanly(self) -> None:
         from openagentic_sdk.console import ConsoleRenderer
         from openagentic_sdk.console.run import console_query
-        from openagentic_sdk.options import OpenAgentOptions
+        from openagentic_sdk.options import OpenAgenticOptions
         from openagentic_sdk.providers.openai_compatible import OpenAICompatibleProvider
 
-        options = OpenAgentOptions(provider=OpenAICompatibleProvider(), model="m", api_key="k", cwd=".")
+        options = OpenAgenticOptions(provider=OpenAICompatibleProvider(), model="m", api_key="k", cwd=".")
 
         async def boom(*_args, **_kwargs):  # noqa: ANN001
             raise RuntimeError("boom")
@@ -26,10 +26,10 @@ class TestConsoleRunHelpers(unittest.TestCase):
     def test_console_query_debug_re_raises(self) -> None:
         from openagentic_sdk.console import ConsoleRenderer
         from openagentic_sdk.console.run import console_query
-        from openagentic_sdk.options import OpenAgentOptions
+        from openagentic_sdk.options import OpenAgenticOptions
         from openagentic_sdk.providers.openai_compatible import OpenAICompatibleProvider
 
-        options = OpenAgentOptions(provider=OpenAICompatibleProvider(), model="m", api_key="k", cwd=".")
+        options = OpenAgenticOptions(provider=OpenAICompatibleProvider(), model="m", api_key="k", cwd=".")
 
         async def boom(*_args, **_kwargs):  # noqa: ANN001
             raise RuntimeError("boom")

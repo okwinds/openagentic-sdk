@@ -7,7 +7,7 @@ import sys
 
 from openagentic_sdk.hooks.engine import HookEngine
 from openagentic_sdk.hooks.models import HookDecision, HookMatcher
-from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.options import OpenAgenticOptions
 from openagentic_sdk.permissions.gate import PermissionGate
 from openagentic_sdk.permissions.interactive import InteractiveApprover
 from openagentic_sdk.providers.openai_compatible import OpenAICompatibleProvider
@@ -58,7 +58,7 @@ def build_options(
     session_root: str | Path | None = None,
     resume: str | None = None,
     interactive: bool = False,
-) -> OpenAgentOptions:
+) -> OpenAgenticOptions:
     session_root_path: Path | None = None
     if session_root is not None:
         session_root_path = Path(session_root)
@@ -105,7 +105,7 @@ def build_options(
         enable_message_rewrite_hooks=True,
     )
 
-    return OpenAgentOptions(
+    return OpenAgenticOptions(
         provider=build_provider_rightcode(),
         api_key=require_env("RIGHTCODE_API_KEY"),
         model=os.getenv("RIGHTCODE_MODEL", "gpt-5.2"),

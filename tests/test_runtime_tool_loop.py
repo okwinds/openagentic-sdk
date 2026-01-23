@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from openagentic_sdk.options import OpenAgentOptions
+from openagentic_sdk.options import OpenAgenticOptions
 from openagentic_sdk.providers.base import ModelOutput, ToolCall
 from openagentic_sdk.sessions.store import FileSessionStore
 from openagentic_sdk.tools.read import ReadTool
@@ -42,7 +42,7 @@ class TestRuntimeToolLoop(unittest.IsolatedAsyncioTestCase):
 
             store = FileSessionStore(root_dir=root)
             tools = ToolRegistry([ReadTool()])
-            options = OpenAgentOptions(
+            options = OpenAgenticOptions(
                 provider=FakeProvider(),
                 model="fake",
                 api_key="x",
