@@ -10,7 +10,7 @@ from openagentic_sdk.hooks.models import HookDecision, HookMatcher
 from openagentic_sdk.options import OpenAgenticOptions
 from openagentic_sdk.permissions.gate import PermissionGate
 from openagentic_sdk.permissions.interactive import InteractiveApprover
-from openagentic_sdk.providers.openai_compatible import OpenAICompatibleProvider
+from openagentic_sdk.providers.openai_responses import OpenAIResponsesProvider
 
 
 def require_env(name: str) -> str:
@@ -40,8 +40,9 @@ def _env_float(name: str, default: float) -> float:
         raise SystemExit(f"Invalid {name}={raw!r}; expected float") from e
 
 
-def build_provider_rightcode() -> OpenAICompatibleProvider:
-    return OpenAICompatibleProvider(
+def build_provider_rightcode() -> OpenAIResponsesProvider:
+    return OpenAIResponsesProvider(
+        name="openai-compatible",
         base_url=os.getenv("RIGHTCODE_BASE_URL", "https://www.right.codes/codex/v1"),
         timeout_s=_env_float("RIGHTCODE_TIMEOUT_S", 120.0),
         max_retries=_env_int("RIGHTCODE_MAX_RETRIES", 2),

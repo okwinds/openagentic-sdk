@@ -12,22 +12,26 @@ class FakeProvider:
     name = "fake"
 
     def __init__(self) -> None:
-        self.seen_messages = []
+        self.seen_inputs = []
+        self.seen_previous_ids = []
         self.calls = 0
 
-    async def complete(self, *, model, messages, tools=(), api_key=None):
-        self.seen_messages.append(list(messages))
+    async def complete(self, *, model, input, tools=(), api_key=None, previous_response_id=None, store=True):
+        _ = (model, tools, api_key, store)
+        self.seen_inputs.append(list(input))
+        self.seen_previous_ids.append(previous_response_id)
         self.calls += 1
         if self.calls == 1:
             return ModelOutput(
                 assistant_text=None,
                 tool_calls=[ToolCall("tc1", "Read", {"file_path": "a.txt"})],
+                response_id="resp_1",
             )
-        return ModelOutput(assistant_text="done", tool_calls=[])
+        return ModelOutput(assistant_text="done", tool_calls=[], response_id="resp_2")
 
 
 class TestResumeRebuild(unittest.IsolatedAsyncioTestCase):
-    async def test_resume_rebuilds_messages(self) -> None:
+    async def test_resume_uses_previous_response_id(self) -> None:
         with TemporaryDirectory() as td:
             root = Path(td)
             (root / "a.txt").write_text("hello", encoding="utf-8")
@@ -64,17 +68,9 @@ class TestResumeRebuild(unittest.IsolatedAsyncioTestCase):
             async for _ in openagentic_sdk.query(prompt="continue", options=options2):
                 pass
 
-            first = provider2.seen_messages[0]
-            roles = [m.get("role") for m in first]
-            self.assertIn("tool", roles)
-            # Ensure tool results have a preceding assistant tool_calls message (OpenAI-compatible requirement).
-            tool_idx = next(i for i, m in enumerate(first) if m.get("role") == "tool")
-            self.assertGreater(tool_idx, 0)
-            prev = first[tool_idx - 1]
-            self.assertEqual(prev.get("role"), "assistant")
-            tool_calls = prev.get("tool_calls")
-            self.assertIsInstance(tool_calls, list)
-            self.assertTrue(any(isinstance(tc, dict) and tc.get("id") == "tc1" for tc in tool_calls))
+            # The resumed run should chain from the previous response id instead of reconstructing full history.
+            self.assertGreaterEqual(len(provider2.seen_previous_ids), 1)
+            self.assertEqual(provider2.seen_previous_ids[0], "resp_2")
 
 
 if __name__ == "__main__":

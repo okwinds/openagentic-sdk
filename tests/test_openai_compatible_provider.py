@@ -11,7 +11,7 @@ class TestOpenAICompatibleProvider(unittest.IsolatedAsyncioTestCase):
         def transport(url, headers, payload):
             seen["url"] = url
             seen["headers"] = dict(headers)
-            return {"choices": [{"message": {"content": "ok"}}]}
+            return {"id": "resp_1", "output": [{"type": "message", "content": [{"type": "output_text", "text": "ok"}]}]}
 
         p = OpenAICompatibleProvider(
             base_url="https://example.test/v1",
@@ -19,18 +19,22 @@ class TestOpenAICompatibleProvider(unittest.IsolatedAsyncioTestCase):
             api_key_header="x-api-key",
         )
 
-        out = await p.complete(model="m", messages=[{"role": "user", "content": "hi"}], api_key="k")
+        out = await p.complete(model="m", input=[{"role": "user", "content": "hi"}], api_key="k")
         self.assertIsInstance(out, ModelOutput)
         self.assertTrue(seen["url"].startswith("https://example.test/v1"))
+        self.assertTrue(seen["url"].endswith("/responses"))
         self.assertEqual(seen["headers"]["x-api-key"], "k")
 
     async def test_stream_yields_text_and_tool_calls(self) -> None:
         chunks = [
-            b'data: {"choices":[{"delta":{"content":"he"}}]}\n\n',
-            b'data: {"choices":[{"delta":{"content":"llo"}}]}\n\n',
-            b'data: {"choices":[{"delta":{"tool_calls":[{"id":"call_1","function":{"name":"Read","arguments":"{\\"file_"}}]}}]}\n\n',
-            b'data: {"choices":[{"delta":{"tool_calls":[{"id":"call_1","function":{"arguments":"path\\":\\"a.txt\\"}"}}]}}]}\n\n',
-            b"data: [DONE]\n\n",
+            b'data: {"type":"response.created","response":{"id":"resp_1"}}\n\n',
+            b'data: {"type":"response.output_item.added","output_index":0,"item":{"id":"msg_1","type":"message"}}\n\n',
+            b'data: {"type":"response.output_text.delta","item_id":"msg_1","delta":"he"}\n\n',
+            b'data: {"type":"response.output_text.delta","item_id":"msg_1","delta":"llo"}\n\n',
+            b'data: {"type":"response.output_item.added","output_index":1,"item":{"id":"fc_1","type":"function_call","call_id":"call_1","name":"Read"}}\n\n',
+            b'data: {"type":"response.function_call_arguments.delta","output_index":1,"delta":"{\\"file_path\\":\\"a.txt\\"}"}\n\n',
+            b'data: {"type":"response.output_item.done","output_index":1,"item":{"id":"fc_1","type":"function_call","call_id":"call_1","name":"Read"}}\n\n',
+            b'data: {"type":"response.completed","response":{"id":"resp_1"}}\n\n',
         ]
 
         def stream_transport(url, headers, payload):
@@ -41,7 +45,7 @@ class TestOpenAICompatibleProvider(unittest.IsolatedAsyncioTestCase):
         events = []
         async for ev in provider.stream(
             model="gpt-4.1-mini",
-            messages=[{"role": "user", "content": "read a.txt"}],
+            input=[{"role": "user", "content": "read a.txt"}],
             tools=[],
             api_key="sk-test",
         ):

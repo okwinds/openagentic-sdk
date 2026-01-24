@@ -25,6 +25,7 @@ from .sessions.rebuild import rebuild_messages
 from .sessions.store import FileSessionStore
 from .tools.base import ToolContext
 from .tools.openai import tool_schemas_for_openai
+from .tools.openai_responses import tool_schemas_for_responses
 from .mcp.sdk import McpSdkServerConfig, wrap_sdk_server_tools
 from ._version import __version__ as _SDK_VERSION
 from .paths import default_session_root
@@ -139,9 +140,14 @@ class AgentRuntime:
             root = options.session_root or _default_session_root()
             store = FileSessionStore(root_dir=root)
 
+        previous_response_id: str | None = None
         if options.resume:
             session_id = options.resume
             past_events = store.read_events(session_id)
+            for e in reversed(past_events):
+                if isinstance(e, Result) and isinstance(getattr(e, "response_id", None), str) and e.response_id:
+                    previous_response_id = e.response_id
+                    break
             messages: list[Mapping[str, Any]] = list(
                 rebuild_messages(
                     past_events,
@@ -219,6 +225,7 @@ class AgentRuntime:
         )
 
         messages.append({"role": "user", "content": prompt3})
+        provider_protocol: str | None = None  # "responses" | "legacy"
         steps = 0
         while steps < options.max_steps:
             if options.abort_event is not None and getattr(options.abort_event, "is_set", lambda: False)():
@@ -247,8 +254,14 @@ class AgentRuntime:
                 tool_names = [t for t in tool_names if t in allowed]
 
             tool_schemas: Sequence[Mapping[str, Any]] = ()
-            if getattr(options.provider, "name", None) in ("openai", "openai-compatible"):
+            if provider_protocol == "legacy":
                 tool_schemas = tool_schemas_for_openai(
+                    tool_names,
+                    registry=options.tools,
+                    context={"cwd": options.cwd, "project_dir": options.project_dir},
+                )
+            else:
+                tool_schemas = tool_schemas_for_responses(
                     tool_names,
                     registry=options.tools,
                     context={"cwd": options.cwd, "project_dir": options.project_dir},
@@ -295,7 +308,35 @@ class AgentRuntime:
                 tool_calls: list[ToolCall] = []
                 stream_fn = getattr(options.provider, "stream")
                 interrupted = False
-                async for ev in stream_fn(model=options.model, messages=messages, tools=tool_schemas, api_key=options.api_key):
+                if provider_protocol == "legacy":
+                    stream_iter = stream_fn(model=options.model, messages=messages, tools=tool_schemas, api_key=options.api_key)
+                else:
+                    try:
+                        stream_iter = stream_fn(
+                            model=options.model,
+                            input=messages,
+                            tools=tool_schemas,
+                            api_key=options.api_key,
+                            previous_response_id=previous_response_id,
+                            store=True,
+                        )
+                        if provider_protocol is None:
+                            provider_protocol = "responses"
+                    except TypeError as e:
+                        if provider_protocol is None and "unexpected keyword argument" in str(e):
+                            provider_protocol = "legacy"
+                            tool_schemas = tool_schemas_for_openai(
+                                tool_names,
+                                registry=options.tools,
+                                context={"cwd": options.cwd, "project_dir": options.project_dir},
+                            )
+                            stream_iter = stream_fn(
+                                model=options.model, messages=messages, tools=tool_schemas, api_key=options.api_key
+                            )
+                        else:
+                            raise
+
+                async for ev in stream_iter:
                     if options.abort_event is not None and getattr(options.abort_event, "is_set", lambda: False)():
                         interrupted = True
                         break
@@ -341,12 +382,41 @@ class AgentRuntime:
                 assistant_text = "".join(parts) if parts else None
                 model_out = ModelOutput(assistant_text=assistant_text, tool_calls=tool_calls)
             else:
-                model_out = await options.provider.complete(
-                    model=options.model,
-                    messages=messages,
-                    tools=tool_schemas,
-                    api_key=options.api_key,
-                )
+                if provider_protocol == "legacy":
+                    model_out = await options.provider.complete(
+                        model=options.model,
+                        messages=messages,
+                        tools=tool_schemas,
+                        api_key=options.api_key,
+                    )
+                else:
+                    try:
+                        model_out = await options.provider.complete(
+                            model=options.model,
+                            input=messages,
+                            tools=tool_schemas,
+                            api_key=options.api_key,
+                            previous_response_id=previous_response_id,
+                            store=True,
+                        )
+                        if provider_protocol is None:
+                            provider_protocol = "responses"
+                    except TypeError as e:
+                        if provider_protocol is None and "unexpected keyword argument" in str(e):
+                            provider_protocol = "legacy"
+                            tool_schemas = tool_schemas_for_openai(
+                                tool_names,
+                                registry=options.tools,
+                                context={"cwd": options.cwd, "project_dir": options.project_dir},
+                            )
+                            model_out = await options.provider.complete(
+                                model=options.model,
+                                messages=messages,
+                                tools=tool_schemas,
+                                api_key=options.api_key,
+                            )
+                        else:
+                            raise
             model_out2, hook_events2, decision2 = await options.hooks.run_after_model_call(
                 output=model_out, context=model_ctx
             )
@@ -372,33 +442,50 @@ class AgentRuntime:
 
             if model_out.tool_calls:
                 tool_calls = list(model_out.tool_calls)
-                # Record assistant tool-call message in provider-native format
-                messages.append(
-                    {
-                        "role": "assistant",
-                        "content": None,
-                        "tool_calls": [
-                            {
-                                "id": tc.tool_use_id,
-                                "type": "function",
-                                "function": {"name": tc.name, "arguments": json.dumps(tc.arguments)},
-                            }
-                            for tc in tool_calls
-                        ],
-                    }
-                )
+                if provider_protocol == "legacy":
+                    # Record assistant tool-call message in OpenAI chat-completions format so tool results can link.
+                    messages.append(
+                        {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [
+                                {
+                                    "id": tc.tool_use_id,
+                                    "type": "function",
+                                    "function": {"name": tc.name, "arguments": json.dumps(tc.arguments)},
+                                }
+                                for tc in tool_calls
+                            ],
+                        }
+                    )
+                    for tc in tool_calls:
+                        async for e in self._run_tool_call(session_id=session_id, tool_call=tc, store=store, hooks=options.hooks):
+                            yield e
+                            if isinstance(e, ToolResult):
+                                messages.append(
+                                    {
+                                        "role": "tool",
+                                        "tool_call_id": tc.tool_use_id,
+                                        "content": json.dumps(e.output, ensure_ascii=False),
+                                    }
+                                )
+                    continue
 
+                tool_output_items: list[Mapping[str, Any]] = []
                 for tc in tool_calls:
                     async for e in self._run_tool_call(session_id=session_id, tool_call=tc, store=store, hooks=options.hooks):
                         yield e
                         if isinstance(e, ToolResult):
-                            messages.append(
+                            tool_output_items.append(
                                 {
-                                    "role": "tool",
-                                    "tool_call_id": tc.tool_use_id,
-                                    "content": json.dumps(e.output, ensure_ascii=False),
+                                    "type": "function_call_output",
+                                    "call_id": tc.tool_use_id,
+                                    "output": json.dumps(e.output, ensure_ascii=False),
                                 }
                             )
+                if model_out.response_id:
+                    previous_response_id = model_out.response_id
+                messages = tool_output_items
                 continue
 
             if model_out.assistant_text is None:
@@ -437,6 +524,9 @@ class AgentRuntime:
                 final_text=model_out.assistant_text,
                 session_id=session_id,
                 stop_reason="end",
+                usage=model_out.usage if isinstance(model_out.usage, dict) else None,
+                response_id=model_out.response_id or previous_response_id,
+                provider_metadata=model_out.provider_metadata if isinstance(model_out.provider_metadata, dict) else None,
                 steps=steps,
                 parent_tool_use_id=self._parent_tool_use_id,
                 agent_name=self._agent_name,

@@ -87,6 +87,8 @@ class Result(EventBase):
     session_id: str = ""
     stop_reason: str | None = None
     usage: Mapping[str, Any] | None = None
+    response_id: str | None = None
+    provider_metadata: Mapping[str, Any] | None = None
     steps: int | None = None
     parent_tool_use_id: str | None = None
     agent_name: str | None = None

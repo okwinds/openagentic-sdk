@@ -1,7 +1,5 @@
 import unittest
 
-from openagentic_sdk.providers.openai import OpenAIProvider
-
 
 def _sse(*payloads: str) -> list[bytes]:
     out: list[bytes] = []
@@ -10,7 +8,7 @@ def _sse(*payloads: str) -> list[bytes]:
     return out
 
 
-class TestOpenAIProviderStream(unittest.IsolatedAsyncioTestCase):
+class TestOpenAIResponsesProviderStream(unittest.IsolatedAsyncioTestCase):
     async def test_stream_yields_text_and_tool_calls(self) -> None:
         chunks = _sse(
             '{"type":"response.created","response":{"id":"resp_1"}}',
@@ -27,24 +25,31 @@ class TestOpenAIProviderStream(unittest.IsolatedAsyncioTestCase):
             _ = (url, headers, payload)
             return iter(chunks)
 
-        provider = OpenAIProvider(stream_transport=stream_transport)
+        from openagentic_sdk.providers.openai_responses import OpenAIResponsesProvider
+
+        provider = OpenAIResponsesProvider(stream_transport=stream_transport)
         events = []
         async for ev in provider.stream(
-            model="gpt-4.1-mini",
+            model="m",
             input=[{"role": "user", "content": "read a.txt"}],
             tools=[],
-            api_key="sk-test",
+            api_key="k",
         ):
             events.append(ev)
 
-        text = "".join(e.delta for e in events if e.type == "text_delta")
+        text = "".join(getattr(e, "delta", "") for e in events if getattr(e, "type", None) == "text_delta")
         self.assertEqual(text, "hello")
 
-        tool_calls = [e.tool_call for e in events if e.type == "tool_call"]
+        tool_calls = [getattr(e, "tool_call", None) for e in events if getattr(e, "type", None) == "tool_call"]
+        tool_calls = [tc for tc in tool_calls if tc is not None]
         self.assertEqual(len(tool_calls), 1)
+        self.assertEqual(tool_calls[0].tool_use_id, "call_1")
         self.assertEqual(tool_calls[0].name, "Read")
         self.assertEqual(tool_calls[0].arguments["file_path"], "a.txt")
+
+        self.assertTrue(any(getattr(e, "type", None) == "done" for e in events))
 
 
 if __name__ == "__main__":
     unittest.main()
+

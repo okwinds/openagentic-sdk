@@ -18,7 +18,7 @@ if str(_REPO_ROOT) not in sys.path:
 from openagentic_sdk.options import OpenAgenticOptions  # noqa: E402
 from openagentic_sdk.permissions.gate import PermissionGate  # noqa: E402
 from openagentic_sdk.permissions.interactive import InteractiveApprover  # noqa: E402
-from openagentic_sdk.providers.openai_compatible import OpenAICompatibleProvider  # noqa: E402
+from openagentic_sdk.providers.openai_responses import OpenAIResponsesProvider  # noqa: E402
 from openagentic_sdk.permissions.gate import Approver, UserAnswerer  # noqa: E402
 
 
@@ -64,12 +64,13 @@ def example_artifact_dir(example_id: str) -> Path:
     return d
 
 
-def rightcode_provider() -> OpenAICompatibleProvider:
+def rightcode_provider() -> OpenAIResponsesProvider:
     base_url = os.environ.get("RIGHTCODE_BASE_URL", "https://www.right.codes/codex/v1")
     timeout_s = float(os.environ.get("RIGHTCODE_TIMEOUT_S", "120"))
     max_retries = int(os.environ.get("RIGHTCODE_MAX_RETRIES", "2"))
     retry_backoff_s = float(os.environ.get("RIGHTCODE_RETRY_BACKOFF_S", "0.5"))
-    return OpenAICompatibleProvider(
+    return OpenAIResponsesProvider(
+        name="openai-compatible",
         base_url=base_url,
         timeout_s=timeout_s,
         max_retries=max_retries,

@@ -40,21 +40,21 @@ class TestOpenAICompatibleRetry(unittest.TestCase):
         from openagentic_sdk.providers import openai_compatible as mod
 
         http_err = urllib.error.HTTPError(
-            url="https://x/chat/completions",
+            url="https://x/responses",
             code=502,
             msg="Bad Gateway",
             hdrs={},
             fp=io.BytesIO(b"error code: 502"),
         )
 
-        ok_body = json.dumps({"choices": [{"message": {"content": "ok"}}]}).encode("utf-8")
+        ok_body = json.dumps({"id": "resp_1", "output": [{"type": "message", "content": [{"type": "output_text", "text": "ok"}]}]}).encode("utf-8")
         with mock.patch.object(urllib.request, "urlopen", side_effect=[http_err, _DummyResponse(ok_body)]) as m_open, mock.patch(
             "time.sleep"
         ) as m_sleep:
             obj = mod._default_transport(  # noqa: SLF001
-                "https://x/chat/completions",
+                "https://x/responses",
                 {"content-type": "application/json"},
-                {"model": "m", "messages": []},
+                {"model": "m", "input": [], "store": True},
                 timeout_s=1.0,
                 max_retries=1,
                 retry_backoff_s=0.0,
@@ -62,7 +62,7 @@ class TestOpenAICompatibleRetry(unittest.TestCase):
 
         self.assertEqual(m_open.call_count, 2)
         self.assertEqual(m_sleep.call_count, 1)
-        self.assertEqual(obj["choices"][0]["message"]["content"], "ok")
+        self.assertEqual(obj["output"][0]["content"][0]["text"], "ok")
 
     def test_default_stream_transport_retries_502(self) -> None:
         import urllib.error
@@ -71,7 +71,7 @@ class TestOpenAICompatibleRetry(unittest.TestCase):
         from openagentic_sdk.providers import openai_compatible as mod
 
         http_err = urllib.error.HTTPError(
-            url="https://x/chat/completions",
+            url="https://x/responses",
             code=502,
             msg="Bad Gateway",
             hdrs={},
@@ -83,9 +83,9 @@ class TestOpenAICompatibleRetry(unittest.TestCase):
             "time.sleep"
         ) as m_sleep:
             chunks = mod._default_stream_transport(  # noqa: SLF001
-                "https://x/chat/completions",
+                "https://x/responses",
                 {"content-type": "application/json"},
-                {"model": "m", "messages": [], "stream": True},
+                {"model": "m", "input": [], "stream": True, "store": True},
                 timeout_s=1.0,
                 max_retries=1,
                 retry_backoff_s=0.0,
@@ -99,4 +99,3 @@ class TestOpenAICompatibleRetry(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

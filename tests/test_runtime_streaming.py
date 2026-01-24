@@ -10,8 +10,8 @@ from openagentic_sdk.sessions.store import FileSessionStore
 class FakeStreamingProvider:
     name = "fake-stream"
 
-    async def stream(self, *, model, messages, tools=(), api_key=None):
-        _ = (model, messages, tools, api_key)
+    async def stream(self, *, model, input, tools=(), api_key=None, previous_response_id=None, store=True):
+        _ = (model, input, tools, api_key, previous_response_id, store)
         yield {"type": "text_delta", "delta": "he"}
         yield {"type": "text_delta", "delta": "llo"}
         yield {"type": "done"}
@@ -42,4 +42,3 @@ class TestRuntimeStreaming(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

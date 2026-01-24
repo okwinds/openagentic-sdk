@@ -10,10 +10,10 @@ class TestCliProviderToolSchemas(unittest.TestCase):
         try:
             opts = build_options(cwd=".", project_dir=".", permission_mode="deny")
             self.assertEqual(getattr(opts.provider, "name", None), "openai-compatible")
+            self.assertEqual(type(opts.provider).__name__, "OpenAIResponsesProvider")
         finally:
             os.environ.pop("RIGHTCODE_API_KEY", None)
 
 
 if __name__ == "__main__":
     unittest.main()
-

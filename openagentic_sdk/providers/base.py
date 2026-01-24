@@ -17,6 +17,8 @@ class ModelOutput:
     tool_calls: Sequence[ToolCall]
     usage: Optional[Mapping[str, Any]] = None
     raw: Optional[Mapping[str, Any]] = None
+    response_id: str | None = None
+    provider_metadata: Optional[Mapping[str, Any]] = None
 
 
 class Provider(Protocol):
@@ -30,4 +32,3 @@ class Provider(Protocol):
         tools: Sequence[Mapping[str, Any]] = (),
         api_key: str | None = None,
     ) -> ModelOutput: ...
-

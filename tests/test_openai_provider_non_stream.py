@@ -5,20 +5,20 @@ from openagentic_sdk.providers.openai import OpenAIProvider
 
 class TestOpenAIProvider(unittest.IsolatedAsyncioTestCase):
     async def test_complete_parses_tool_calls(self) -> None:
+        seen = {}
+
         def transport(url, headers, payload):
+            seen["url"] = url
+            seen["headers"] = dict(headers)
+            seen["payload"] = dict(payload)
             return {
-                "choices": [
+                "id": "resp_1",
+                "output": [
                     {
-                        "message": {
-                            "content": None,
-                            "tool_calls": [
-                                {
-                                    "id": "call_1",
-                                    "type": "function",
-                                    "function": {"name": "Read", "arguments": "{\"file_path\":\"a.txt\"}"},
-                                }
-                            ],
-                        }
+                        "type": "function_call",
+                        "call_id": "call_1",
+                        "name": "Read",
+                        "arguments": "{\"file_path\":\"a.txt\"}",
                     }
                 ],
                 "usage": {"total_tokens": 10},
@@ -27,10 +27,12 @@ class TestOpenAIProvider(unittest.IsolatedAsyncioTestCase):
         p = OpenAIProvider(transport=transport)
         out = await p.complete(
             model="gpt-4.1-mini",
-            messages=[{"role": "user", "content": "read a.txt"}],
+            input=[{"role": "user", "content": "read a.txt"}],
             tools=[],
             api_key="sk-test",
         )
+
+        self.assertTrue(seen["url"].endswith("/responses"))
         self.assertIsNone(out.assistant_text)
         self.assertEqual(len(out.tool_calls), 1)
         self.assertEqual(out.tool_calls[0].name, "Read")
@@ -39,4 +41,3 @@ class TestOpenAIProvider(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

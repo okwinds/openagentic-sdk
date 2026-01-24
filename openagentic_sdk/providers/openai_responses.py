@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import json
-import time
-import urllib.request
-import urllib.error
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Mapping, Optional, Sequence
 
 from .base import ModelOutput, ToolCall
+from .openai_compatible import _default_stream_transport, _default_transport  # noqa: PLC2701
 from .sse import parse_sse_events
 from .stream_events import DoneEvent, TextDeltaEvent, ToolCallEvent
 
@@ -15,122 +13,14 @@ from .stream_events import DoneEvent, TextDeltaEvent, ToolCallEvent
 Transport = Callable[[str, Mapping[str, str], Mapping[str, Any]], Mapping[str, Any]]
 StreamTransport = Callable[[str, Mapping[str, str], Mapping[str, Any]], Iterable[bytes]]
 
-_RETRYABLE_HTTP_STATUS: set[int] = {408, 409, 425, 429, 500, 502, 503, 504}
 
-
-def _backoff_seconds(attempt_index: int, base: float) -> float:
-    # attempt_index: 0 for first retry, 1 for second retry, ...
-    if attempt_index < 0:
-        return 0.0
-    return max(0.0, base) * (2**attempt_index)
-
-
-def _read_http_error_body(e: urllib.error.HTTPError) -> str:
-    try:
-        return e.read().decode("utf-8", errors="replace")
-    except Exception:  # noqa: BLE001
-        return ""
-
-
-def _runtime_http_error(url: str, e: urllib.error.HTTPError) -> RuntimeError:
-    body = _read_http_error_body(e)
-    hint = " (transient upstream error; try again)" if int(getattr(e, "code", 0)) in _RETRYABLE_HTTP_STATUS else ""
-    return RuntimeError(f"HTTP {e.code} from {url}{hint}: {body}".strip())
-
-
-def _default_transport(
-    url: str,
-    headers: Mapping[str, str],
-    payload: Mapping[str, Any],
-    *,
-    timeout_s: float,
-    max_retries: int = 0,
-    retry_backoff_s: float = 0.5,
-) -> Mapping[str, Any]:
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(url, data=data, method="POST")
-    for k, v in headers.items():
-        req.add_header(k, v)
-    last_exc: Exception | None = None
-    max_retries = max(0, int(max_retries))
-    for attempt in range(max_retries + 1):
-        try:
-            with urllib.request.urlopen(req, timeout=timeout_s) as resp:
-                raw = resp.read()
-            break
-        except urllib.error.HTTPError as e:
-            last_exc = e
-            if attempt < max_retries and int(getattr(e, "code", 0)) in _RETRYABLE_HTTP_STATUS:
-                time.sleep(_backoff_seconds(attempt, retry_backoff_s))
-                continue
-            raise _runtime_http_error(url, e) from e
-        except urllib.error.URLError as e:
-            last_exc = e
-            if attempt < max_retries:
-                time.sleep(_backoff_seconds(attempt, retry_backoff_s))
-                continue
-            raise RuntimeError(f"Request failed to {url}: {e}".strip()) from e
-    else:  # pragma: no cover
-        raise RuntimeError(f"Request failed to {url}: {last_exc}".strip()) from last_exc
-    return json.loads(raw.decode("utf-8"))
-
-
-def _default_stream_transport(
-    url: str,
-    headers: Mapping[str, str],
-    payload: Mapping[str, Any],
-    *,
-    timeout_s: float,
-    max_retries: int = 0,
-    retry_backoff_s: float = 0.5,
-) -> Iterable[bytes]:
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(url, data=data, method="POST")
-    for k, v in headers.items():
-        req.add_header(k, v)
-    max_retries = max(0, int(max_retries))
-    resp = None
-    for attempt in range(max_retries + 1):
-        try:
-            resp = urllib.request.urlopen(req, timeout=timeout_s)
-            break
-        except urllib.error.HTTPError as e:
-            if attempt < max_retries and int(getattr(e, "code", 0)) in _RETRYABLE_HTTP_STATUS:
-                time.sleep(_backoff_seconds(attempt, retry_backoff_s))
-                continue
-            raise _runtime_http_error(url, e) from e
-        except urllib.error.URLError as e:
-            if attempt < max_retries:
-                time.sleep(_backoff_seconds(attempt, retry_backoff_s))
-                continue
-            raise RuntimeError(f"Request failed to {url}: {e}".strip()) from e
-    if resp is None:  # pragma: no cover
-        raise RuntimeError(f"Request failed to {url}".strip())
-    try:
-        while True:
-            chunk = resp.readline()
-            if not chunk:
-                break
-            yield chunk
-    finally:
-        resp.close()
-
-
-def _iter_lines(chunks: Iterable[bytes]) -> Iterable[bytes]:
-    buf = b""
-    for chunk in chunks:
-        if not chunk:
-            continue
-        buf += chunk
-        while True:
-            idx = buf.find(b"\n")
-            if idx < 0:
-                break
-            line = buf[: idx + 1]
-            buf = buf[idx + 1 :]
-            yield line
-    if buf:
-        yield buf
+def _build_headers(*, api_key_header: str, api_key: str) -> dict[str, str]:
+    headers = {"content-type": "application/json"}
+    if api_key_header.lower() == "authorization":
+        headers["authorization"] = f"Bearer {api_key}"
+    else:
+        headers[api_key_header] = api_key
+    return headers
 
 
 def _parse_tool_call(item: Mapping[str, Any]) -> ToolCall | None:
@@ -174,9 +64,26 @@ def _parse_assistant_text(output_items: Sequence[Mapping[str, Any]]) -> str | No
     return "".join(parts)
 
 
+def _iter_lines(chunks: Iterable[bytes]) -> Iterable[bytes]:
+    buf = b""
+    for chunk in chunks:
+        if not chunk:
+            continue
+        buf += chunk
+        while True:
+            idx = buf.find(b"\n")
+            if idx < 0:
+                break
+            line = buf[: idx + 1]
+            buf = buf[idx + 1 :]
+            yield line
+    if buf:
+        yield buf
+
+
 @dataclass(frozen=True, slots=True)
-class OpenAICompatibleProvider:
-    name: str = "openai-compatible"
+class OpenAIResponsesProvider:
+    name: str = "openai-responses"
     base_url: str = "https://api.openai.com/v1"
     api_key_header: str = "authorization"
     timeout_s: float = 60.0
@@ -197,14 +104,10 @@ class OpenAICompatibleProvider:
         include: Sequence[str] = (),
     ) -> ModelOutput:
         if not api_key:
-            raise ValueError("OpenAICompatibleProvider: api_key is required")
+            raise ValueError("OpenAIResponsesProvider: api_key is required")
 
         url = f"{self.base_url}/responses"
-        headers = {"content-type": "application/json"}
-        if self.api_key_header.lower() == "authorization":
-            headers["authorization"] = f"Bearer {api_key}"
-        else:
-            headers[self.api_key_header] = api_key
+        headers = _build_headers(api_key_header=self.api_key_header, api_key=api_key)
 
         payload: dict[str, Any] = {"model": model, "input": list(input), "store": bool(store)}
         if previous_response_id:
@@ -225,23 +128,28 @@ class OpenAICompatibleProvider:
             )
         else:
             obj = self.transport(url, headers, payload)
+
         output = obj.get("output")
         output_items: list[Mapping[str, Any]] = [x for x in (output or []) if isinstance(x, dict)]
 
         assistant_text = _parse_assistant_text(output_items)
-        tool_calls_out: list[ToolCall] = []
+        tool_calls: list[ToolCall] = []
         for item in output_items:
             if item.get("type") == "function_call":
                 tc = _parse_tool_call(item)
                 if tc is not None:
-                    tool_calls_out.append(tc)
+                    tool_calls.append(tc)
 
+        response_id = obj.get("id") if isinstance(obj.get("id"), str) else None
+        usage = obj.get("usage") if isinstance(obj.get("usage"), dict) else None
+        raw = obj if isinstance(obj, dict) else None
         return ModelOutput(
             assistant_text=assistant_text,
-            tool_calls=tool_calls_out,
-            usage=obj.get("usage") if isinstance(obj.get("usage"), dict) else None,
-            raw=obj if isinstance(obj, dict) else None,
-            response_id=obj.get("id") if isinstance(obj.get("id"), str) else None,
+            tool_calls=tool_calls,
+            usage=usage,
+            raw=raw,
+            response_id=response_id,
+            provider_metadata=None,
         )
 
     async def stream(
@@ -256,21 +164,12 @@ class OpenAICompatibleProvider:
         include: Sequence[str] = (),
     ):
         if not api_key:
-            raise ValueError("OpenAICompatibleProvider: api_key is required")
+            raise ValueError("OpenAIResponsesProvider: api_key is required")
 
         url = f"{self.base_url}/responses"
-        headers = {"content-type": "application/json"}
-        if self.api_key_header.lower() == "authorization":
-            headers["authorization"] = f"Bearer {api_key}"
-        else:
-            headers[self.api_key_header] = api_key
+        headers = _build_headers(api_key_header=self.api_key_header, api_key=api_key)
 
-        payload: dict[str, Any] = {
-            "model": model,
-            "input": list(input),
-            "stream": True,
-            "store": bool(store),
-        }
+        payload: dict[str, Any] = {"model": model, "input": list(input), "stream": True, "store": bool(store)}
         if previous_response_id:
             payload["previous_response_id"] = previous_response_id
         if include:
