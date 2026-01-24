@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal, Mapping
 
 from .base import ToolCall
 
@@ -21,4 +21,5 @@ class ToolCallEvent:
 @dataclass(frozen=True, slots=True)
 class DoneEvent:
     type: Literal["done"] = "done"
-
+    response_id: str | None = None
+    usage: Mapping[str, Any] | None = None

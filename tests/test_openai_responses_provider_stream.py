@@ -47,9 +47,13 @@ class TestOpenAIResponsesProviderStream(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(tool_calls[0].name, "Read")
         self.assertEqual(tool_calls[0].arguments["file_path"], "a.txt")
 
-        self.assertTrue(any(getattr(e, "type", None) == "done" for e in events))
+        done_events = [e for e in events if getattr(e, "type", None) == "done"]
+        self.assertEqual(len(done_events), 1)
+        self.assertEqual(getattr(done_events[0], "response_id", None), "resp_1")
+        usage = getattr(done_events[0], "usage", None)
+        self.assertIsInstance(usage, dict)
+        self.assertEqual(usage.get("total_tokens"), 10)
 
 
 if __name__ == "__main__":
     unittest.main()
-

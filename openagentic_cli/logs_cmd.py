@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter, deque
-from typing import Iterable
+from typing import Iterable, Mapping
 
 from openagentic_sdk.events import Event
 
@@ -21,6 +21,7 @@ def summarize_events(
     counts: Counter[str] = Counter()
     recent_tool_lines: deque[str] = deque(maxlen=10)
     last_stop_reason: str | None = None
+    last_protocol: str | None = None
 
     tool_names: dict[str, str] = {}
     tool_results: dict[str, str] = {}
@@ -42,6 +43,11 @@ def summarize_events(
         if t == "result":
             sr = getattr(e, "stop_reason", None)
             last_stop_reason = str(sr) if sr is not None else None
+            pm = getattr(e, "provider_metadata", None)
+            if isinstance(pm, Mapping):
+                proto = pm.get("protocol")
+                if isinstance(proto, str) and proto:
+                    last_protocol = proto
 
     for tool_use_id, name in list(tool_names.items())[-10:]:
         res = tool_results.get(tool_use_id)
@@ -69,5 +75,8 @@ def summarize_events(
             + (fg_green(last_stop_reason, enabled=enable_color) if last_stop_reason else fg_red("unknown", enabled=enable_color))
         )
 
-    return "\n".join(lines).rstrip() + "\n"
+    if last_protocol is not None:
+        lines.append("")
+        lines.append(dim("Protocol: ", enabled=enable_color) + fg_green(last_protocol, enabled=enable_color))
 
+    return "\n".join(lines).rstrip() + "\n"

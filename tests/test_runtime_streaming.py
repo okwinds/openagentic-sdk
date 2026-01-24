@@ -14,7 +14,7 @@ class FakeStreamingProvider:
         _ = (model, input, tools, api_key, previous_response_id, store)
         yield {"type": "text_delta", "delta": "he"}
         yield {"type": "text_delta", "delta": "llo"}
-        yield {"type": "done"}
+        yield {"type": "done", "response_id": "resp_1", "usage": {"total_tokens": 3}}
 
 
 class TestRuntimeStreaming(unittest.IsolatedAsyncioTestCase):
@@ -33,11 +33,15 @@ class TestRuntimeStreaming(unittest.IsolatedAsyncioTestCase):
             import openagentic_sdk
 
             types = []
+            result_response_id = None
             async for e in openagentic_sdk.query(prompt="hi", options=options):
                 types.append(getattr(e, "type", None))
+                if getattr(e, "type", None) == "result":
+                    result_response_id = getattr(e, "response_id", None)
             self.assertIn("assistant.delta", types)
             self.assertIn("assistant.message", types)
             self.assertIn("result", types)
+            self.assertEqual(result_response_id, "resp_1")
 
 
 if __name__ == "__main__":

@@ -21,7 +21,7 @@ from .options import OpenAgenticOptions
 from .providers.base import ModelOutput, ToolCall
 from .project.claude import load_claude_project_settings
 from .skills.index import index_skills
-from .sessions.rebuild import rebuild_messages
+from .sessions.rebuild import rebuild_messages, rebuild_responses_input
 from .sessions.store import FileSessionStore
 from .tools.base import ToolContext
 from .tools.openai import tool_schemas_for_openai
@@ -110,6 +110,14 @@ def _maybe_expand_list_skills_prompt(prompt: str, options: OpenAgenticOptions) -
     )
 
 
+def _unsupported_previous_response_id_error(e: BaseException) -> bool:
+    msg = str(e)
+    if not msg:
+        return False
+    msg_l = msg.lower()
+    return "previous_response_id" in msg_l and ("unsupported parameter" in msg_l or "unsupported" in msg_l)
+
+
 @dataclass(frozen=True, slots=True)
 class RunResult:
     final_text: str
@@ -141,20 +149,41 @@ class AgentRuntime:
             store = FileSessionStore(root_dir=root)
 
         previous_response_id: str | None = None
+        supports_previous_response_id = True
+        resume_protocol: str | None = None
         if options.resume:
             session_id = options.resume
             past_events = store.read_events(session_id)
             for e in reversed(past_events):
+                if isinstance(e, Result) and isinstance(getattr(e, "provider_metadata", None), dict):
+                    pm = e.provider_metadata or {}
+                    proto = pm.get("protocol")
+                    if isinstance(proto, str) and proto:
+                        resume_protocol = proto
+                    spri = pm.get("supports_previous_response_id")
+                    if isinstance(spri, bool):
+                        supports_previous_response_id = spri
+                    break
+            for e in reversed(past_events):
                 if isinstance(e, Result) and isinstance(getattr(e, "response_id", None), str) and e.response_id:
                     previous_response_id = e.response_id
                     break
-            messages: list[Mapping[str, Any]] = list(
-                rebuild_messages(
-                    past_events,
-                    max_events=options.resume_max_events,
-                    max_bytes=options.resume_max_bytes,
+            if resume_protocol == "responses" and supports_previous_response_id is False:
+                messages = list(
+                    rebuild_responses_input(
+                        past_events,
+                        max_events=options.resume_max_events,
+                        max_bytes=options.resume_max_bytes,
+                    )
                 )
-            )
+            else:
+                messages = list(
+                    rebuild_messages(
+                        past_events,
+                        max_events=options.resume_max_events,
+                        max_bytes=options.resume_max_bytes,
+                    )
+                )
         else:
             metadata: dict[str, Any] = {
                 "cwd": options.cwd,
@@ -304,66 +333,106 @@ class AgentRuntime:
 
             model_out: ModelOutput
             if hasattr(options.provider, "stream"):
-                parts: list[str] = []
-                tool_calls: list[ToolCall] = []
                 stream_fn = getattr(options.provider, "stream")
                 interrupted = False
-                if provider_protocol == "legacy":
-                    stream_iter = stream_fn(model=options.model, messages=messages, tools=tool_schemas, api_key=options.api_key)
-                else:
-                    try:
-                        stream_iter = stream_fn(
-                            model=options.model,
-                            input=messages,
-                            tools=tool_schemas,
-                            api_key=options.api_key,
-                            previous_response_id=previous_response_id,
-                            store=True,
-                        )
-                        if provider_protocol is None:
-                            provider_protocol = "responses"
-                    except TypeError as e:
-                        if provider_protocol is None and "unexpected keyword argument" in str(e):
-                            provider_protocol = "legacy"
-                            tool_schemas = tool_schemas_for_openai(
-                                tool_names,
-                                registry=options.tools,
-                                context={"cwd": options.cwd, "project_dir": options.project_dir},
-                            )
-                            stream_iter = stream_fn(
-                                model=options.model, messages=messages, tools=tool_schemas, api_key=options.api_key
-                            )
-                        else:
-                            raise
+                parts: list[str] = []
+                tool_calls: list[ToolCall] = []
+                stream_response_id: str | None = None
+                stream_usage: Mapping[str, Any] | None = None
 
-                async for ev in stream_iter:
-                    if options.abort_event is not None and getattr(options.abort_event, "is_set", lambda: False)():
-                        interrupted = True
-                        break
-                    ev_type = getattr(ev, "type", None)
-                    if ev_type is None and isinstance(ev, dict):
-                        ev_type = ev.get("type")
-                    if ev_type == "text_delta":
-                        delta = getattr(ev, "delta", None)
-                        if delta is None and isinstance(ev, dict):
-                            delta = ev.get("delta")
-                        if isinstance(delta, str) and delta:
-                            parts.append(delta)
-                            de = AssistantDelta(
-                                text_delta=delta,
-                                parent_tool_use_id=self._parent_tool_use_id,
-                                agent_name=self._agent_name,
+                for attempt in range(2):
+                    parts = []
+                    tool_calls = []
+                    stream_response_id = None
+                    stream_usage = None
+
+                    if provider_protocol == "legacy":
+                        stream_iter = stream_fn(
+                            model=options.model, messages=messages, tools=tool_schemas, api_key=options.api_key
+                        )
+                    else:
+                        prev_id = previous_response_id if supports_previous_response_id else None
+                        try:
+                            stream_iter = stream_fn(
+                                model=options.model,
+                                input=messages,
+                                tools=tool_schemas,
+                                api_key=options.api_key,
+                                previous_response_id=prev_id,
+                                store=True,
                             )
-                            store.append_event(session_id, de)
-                            yield de
-                    elif ev_type == "tool_call":
-                        tc = getattr(ev, "tool_call", None)
-                        if tc is None and isinstance(ev, dict):
-                            tc = ev.get("tool_call")
-                        if isinstance(tc, ToolCall):
-                            tool_calls.append(tc)
-                    elif ev_type == "done":
-                        break
+                            if provider_protocol is None:
+                                provider_protocol = "responses"
+                        except TypeError as e:
+                            if provider_protocol is None and "unexpected keyword argument" in str(e):
+                                provider_protocol = "legacy"
+                                tool_schemas = tool_schemas_for_openai(
+                                    tool_names,
+                                    registry=options.tools,
+                                    context={"cwd": options.cwd, "project_dir": options.project_dir},
+                                )
+                                stream_iter = stream_fn(
+                                    model=options.model, messages=messages, tools=tool_schemas, api_key=options.api_key
+                                )
+                            else:
+                                raise
+
+                    try:
+                        async for ev in stream_iter:
+                            if options.abort_event is not None and getattr(options.abort_event, "is_set", lambda: False)():
+                                interrupted = True
+                                break
+                            ev_type = getattr(ev, "type", None)
+                            if ev_type is None and isinstance(ev, dict):
+                                ev_type = ev.get("type")
+                            if ev_type == "text_delta":
+                                delta = getattr(ev, "delta", None)
+                                if delta is None and isinstance(ev, dict):
+                                    delta = ev.get("delta")
+                                if isinstance(delta, str) and delta:
+                                    parts.append(delta)
+                                    de = AssistantDelta(
+                                        text_delta=delta,
+                                        parent_tool_use_id=self._parent_tool_use_id,
+                                        agent_name=self._agent_name,
+                                    )
+                                    store.append_event(session_id, de)
+                                    yield de
+                            elif ev_type == "tool_call":
+                                tc = getattr(ev, "tool_call", None)
+                                if tc is None and isinstance(ev, dict):
+                                    tc = ev.get("tool_call")
+                                if isinstance(tc, ToolCall):
+                                    tool_calls.append(tc)
+                            elif ev_type == "done":
+                                rid = getattr(ev, "response_id", None)
+                                if rid is None and isinstance(ev, dict):
+                                    rid = ev.get("response_id")
+                                if isinstance(rid, str) and rid:
+                                    stream_response_id = rid
+
+                                u = getattr(ev, "usage", None)
+                                if u is None and isinstance(ev, dict):
+                                    u = ev.get("usage")
+                                if isinstance(u, dict):
+                                    stream_usage = u
+                                break
+                    except RuntimeError as e:
+                        can_retry = (
+                            provider_protocol != "legacy"
+                            and attempt == 0
+                            and supports_previous_response_id
+                            and previous_response_id is not None
+                            and not parts
+                            and not tool_calls
+                            and stream_response_id is None
+                            and _unsupported_previous_response_id_error(e)
+                        )
+                        if can_retry:
+                            supports_previous_response_id = False
+                            continue
+                        raise
+                    break
                 if interrupted:
                     for he in await options.hooks.run_session_end(context=model_ctx):
                         store.append_event(session_id, he)
@@ -380,7 +449,12 @@ class AgentRuntime:
                     yield final
                     return
                 assistant_text = "".join(parts) if parts else None
-                model_out = ModelOutput(assistant_text=assistant_text, tool_calls=tool_calls)
+                model_out = ModelOutput(
+                    assistant_text=assistant_text,
+                    tool_calls=tool_calls,
+                    usage=stream_usage,
+                    response_id=stream_response_id,
+                )
             else:
                 if provider_protocol == "legacy":
                     model_out = await options.provider.complete(
@@ -390,17 +464,38 @@ class AgentRuntime:
                         api_key=options.api_key,
                     )
                 else:
+                    prev_id = previous_response_id if supports_previous_response_id else None
                     try:
                         model_out = await options.provider.complete(
                             model=options.model,
                             input=messages,
                             tools=tool_schemas,
                             api_key=options.api_key,
-                            previous_response_id=previous_response_id,
+                            previous_response_id=prev_id,
                             store=True,
                         )
                         if provider_protocol is None:
                             provider_protocol = "responses"
+                    except RuntimeError as e:
+                        can_retry = (
+                            supports_previous_response_id
+                            and previous_response_id is not None
+                            and _unsupported_previous_response_id_error(e)
+                        )
+                        if can_retry:
+                            supports_previous_response_id = False
+                            model_out = await options.provider.complete(
+                                model=options.model,
+                                input=messages,
+                                tools=tool_schemas,
+                                api_key=options.api_key,
+                                previous_response_id=None,
+                                store=True,
+                            )
+                            if provider_protocol is None:
+                                provider_protocol = "responses"
+                        else:
+                            raise
                     except TypeError as e:
                         if provider_protocol is None and "unexpected keyword argument" in str(e):
                             provider_protocol = "legacy"
@@ -471,21 +566,43 @@ class AgentRuntime:
                                 )
                     continue
 
-                tool_output_items: list[Mapping[str, Any]] = []
+                if supports_previous_response_id:
+                    tool_output_items: list[Mapping[str, Any]] = []
+                    for tc in tool_calls:
+                        async for e in self._run_tool_call(session_id=session_id, tool_call=tc, store=store, hooks=options.hooks):
+                            yield e
+                            if isinstance(e, ToolResult):
+                                tool_output_items.append(
+                                    {
+                                        "type": "function_call_output",
+                                        "call_id": tc.tool_use_id,
+                                        "output": json.dumps(e.output, ensure_ascii=False),
+                                    }
+                                )
+                    if model_out.response_id:
+                        previous_response_id = model_out.response_id
+                    messages = tool_output_items
+                    continue
+
                 for tc in tool_calls:
+                    messages.append(
+                        {
+                            "type": "function_call",
+                            "call_id": tc.tool_use_id,
+                            "name": tc.name,
+                            "arguments": json.dumps(tc.arguments, ensure_ascii=False),
+                        }
+                    )
                     async for e in self._run_tool_call(session_id=session_id, tool_call=tc, store=store, hooks=options.hooks):
                         yield e
                         if isinstance(e, ToolResult):
-                            tool_output_items.append(
+                            messages.append(
                                 {
                                     "type": "function_call_output",
                                     "call_id": tc.tool_use_id,
                                     "output": json.dumps(e.output, ensure_ascii=False),
                                 }
                             )
-                if model_out.response_id:
-                    previous_response_id = model_out.response_id
-                messages = tool_output_items
                 continue
 
             if model_out.assistant_text is None:
@@ -526,7 +643,16 @@ class AgentRuntime:
                 stop_reason="end",
                 usage=model_out.usage if isinstance(model_out.usage, dict) else None,
                 response_id=model_out.response_id or previous_response_id,
-                provider_metadata=model_out.provider_metadata if isinstance(model_out.provider_metadata, dict) else None,
+                provider_metadata={
+                    **({"protocol": provider_protocol} if provider_protocol else {}),
+                    **(
+                        {"supports_previous_response_id": supports_previous_response_id}
+                        if provider_protocol == "responses"
+                        else {}
+                    ),
+                    **(dict(model_out.provider_metadata) if isinstance(model_out.provider_metadata, dict) else {}),
+                }
+                or None,
                 steps=steps,
                 parent_tool_use_id=self._parent_tool_use_id,
                 agent_name=self._agent_name,

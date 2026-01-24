@@ -189,10 +189,12 @@ class OpenAIResponsesProvider:
         else:
             chunks = self.stream_transport(url, headers, payload)
 
+        response_id: str | None = None
+        usage: Mapping[str, Any] | None = None
         ongoing: dict[int, dict[str, Any]] = {}
         for data in parse_sse_events(_iter_lines(chunks)):
             if data.strip() == "[DONE]":
-                yield DoneEvent()
+                yield DoneEvent(response_id=response_id, usage=usage)
                 return
             try:
                 obj = json.loads(data)
@@ -202,6 +204,14 @@ class OpenAIResponsesProvider:
                 continue
             typ = obj.get("type")
             if not isinstance(typ, str):
+                continue
+
+            if typ == "response.created":
+                resp = obj.get("response")
+                if isinstance(resp, dict):
+                    rid = resp.get("id")
+                    if isinstance(rid, str) and rid:
+                        response_id = rid
                 continue
 
             if typ == "response.output_text.delta":
@@ -245,7 +255,15 @@ class OpenAIResponsesProvider:
                 continue
 
             if typ in ("response.completed", "response.incomplete"):
-                yield DoneEvent()
+                resp = obj.get("response")
+                if isinstance(resp, dict):
+                    rid = resp.get("id")
+                    if isinstance(rid, str) and rid:
+                        response_id = rid
+                    u = resp.get("usage")
+                    if isinstance(u, dict):
+                        usage = u
+                yield DoneEvent(response_id=response_id, usage=usage)
                 return
 
-        yield DoneEvent()
+        yield DoneEvent(response_id=response_id, usage=usage)
