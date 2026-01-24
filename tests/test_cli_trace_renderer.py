@@ -24,6 +24,17 @@ class TestCliTraceRenderer(unittest.TestCase):
         self.assertIn("pwd", s)
         self.assertIn("exit_code=0", s)
 
+    def test_write_tool_use_includes_path(self) -> None:
+        from openagentic_cli.trace import TraceRenderer
+
+        out = io.StringIO()
+        r = TraceRenderer(stream=out, color=False)
+
+        r.on_event(ToolUse(tool_use_id="t1", name="Write", input={"file_path": "out.txt", "content": "x"}))
+        r.on_event(ToolResult(tool_use_id="t1", output={"message": "Wrote 1 bytes", "file_path": "/tmp/out.txt"}, is_error=False))
+
+        self.assertIn("Write `out.txt`", out.getvalue())
+
     def test_rg_help_is_printed_when_missing_pattern(self) -> None:
         from openagentic_cli.trace import TraceRenderer
 

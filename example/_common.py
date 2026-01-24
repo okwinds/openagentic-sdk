@@ -34,10 +34,25 @@ def run_sync(coro: Awaitable[Any]) -> Any:
     return asyncio.run(coro)
 
 
+def _env_flag(name: str) -> bool:
+    v = os.environ.get(name)
+    if v is None:
+        return False
+    return v.strip().lower() in ("1", "true", "yes", "y", "on")
+
+
+def example_offline_enabled() -> bool:
+    # Makes the examples runnable without external API keys/network access.
+    # The SDK remains unchanged; only example plumbing switches providers.
+    return _env_flag("OPENAGENTIC_SDK_EXAMPLE_OFFLINE")
+
+
 def require_env(name: str) -> str:
     val = os.environ.get(name)
     if val:
         return val
+    if example_offline_enabled():
+        return "offline"
     raise SystemExit(
         f"Missing required env var: {name}\n"
         "Set RIGHTCODE_API_KEY (and optionally RIGHTCODE_BASE_URL/RIGHTCODE_MODEL/RIGHTCODE_TIMEOUT_S) then rerun."
@@ -48,6 +63,8 @@ def require_env_simple(name: str, *, help: str) -> str:
     val = os.environ.get(name)
     if val:
         return val
+    if example_offline_enabled():
+        return "offline"
     raise SystemExit(f"Missing required env var: {name}\n{help}")
 
 
@@ -64,7 +81,25 @@ def example_artifact_dir(example_id: str) -> Path:
     return d
 
 
+class _ExampleOfflineProvider:
+    """
+    Minimal provider for example smoke-runs (no network, no keys).
+
+    It emits a tiny streaming response so all examples can execute end-to-end.
+    """
+
+    name = "example-offline"
+
+    async def stream(self, *, model, input, tools=(), api_key=None, previous_response_id=None, store=True):  # noqa: ANN001
+        _ = (model, input, tools, api_key, previous_response_id, store)
+        yield {"type": "text_delta", "delta": "OFFLINE_EXAMPLE_OK"}
+        yield {"type": "done", "response_id": "resp_offline", "usage": {"total_tokens": 0}}
+
+
 def rightcode_provider() -> OpenAIResponsesProvider:
+    if example_offline_enabled():
+        # Type ignore: runtime only needs a `.stream()` method for examples.
+        return _ExampleOfflineProvider()  # type: ignore[return-value]
     base_url = os.environ.get("RIGHTCODE_BASE_URL", "https://www.right.codes/codex/v1")
     timeout_s = float(os.environ.get("RIGHTCODE_TIMEOUT_S", "120"))
     max_retries = int(os.environ.get("RIGHTCODE_MAX_RETRIES", "2"))
@@ -91,6 +126,12 @@ def rightcode_options(
     ) -> OpenAgenticOptions:
     api_key = require_env("RIGHTCODE_API_KEY")
     model = os.environ.get("RIGHTCODE_MODEL", "gpt-5.2")
+
+    # Test harness overrides (used by scripts/verify_examples.py)
+    permission_mode = os.environ.get("OPENAGENTIC_SDK_EXAMPLE_PERMISSION_MODE", permission_mode)
+    if os.environ.get("OPENAGENTIC_SDK_EXAMPLE_INTERACTIVE") is not None:
+        interactive = _env_flag("OPENAGENTIC_SDK_EXAMPLE_INTERACTIVE")
+
     return OpenAgenticOptions(
         provider=rightcode_provider(),
         model=model,

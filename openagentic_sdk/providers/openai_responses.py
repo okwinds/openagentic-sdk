@@ -206,6 +206,11 @@ class OpenAIResponsesProvider:
             if not isinstance(typ, str):
                 continue
 
+            # Some gateways include `response_id` on every event (and may omit `response.created`).
+            rid0 = obj.get("response_id")
+            if isinstance(rid0, str) and rid0:
+                response_id = rid0
+
             if typ == "response.created":
                 resp = obj.get("response")
                 if isinstance(resp, dict):

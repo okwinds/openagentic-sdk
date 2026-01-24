@@ -23,6 +23,15 @@ def _summarize_tool_use(name: str, tool_input: Mapping[str, Any] | None) -> str:
     if name == "Read":
         p = inp.get("file_path", inp.get("filePath"))
         return f"Read `{p}`" if isinstance(p, str) and p else "Read"
+    if name == "Write":
+        p = inp.get("file_path", inp.get("filePath"))
+        return f"Write `{p}`" if isinstance(p, str) and p else "Write"
+    if name == "Edit":
+        p = inp.get("file_path", inp.get("filePath"))
+        return f"Edit `{p}`" if isinstance(p, str) and p else "Edit"
+    if name == "NotebookEdit":
+        p = inp.get("notebook_path")
+        return f"NotebookEdit `{p}`" if isinstance(p, str) and p else "NotebookEdit"
     if name == "Grep":
         q = inp.get("query")
         glob = inp.get("file_glob", "**/*")

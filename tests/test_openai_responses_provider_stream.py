@@ -54,6 +54,33 @@ class TestOpenAIResponsesProviderStream(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(usage, dict)
         self.assertEqual(usage.get("total_tokens"), 10)
 
+    async def test_stream_captures_response_id_from_response_id_field(self) -> None:
+        chunks = _sse(
+            '{"type":"response.output_item.added","response_id":"resp_1","output_index":0,"item":{"id":"msg_1","type":"message"}}',
+            '{"type":"response.output_text.delta","response_id":"resp_1","item_id":"msg_1","delta":"hi"}',
+            "[DONE]",
+        )
+
+        def stream_transport(url, headers, payload):
+            _ = (url, headers, payload)
+            return iter(chunks)
+
+        from openagentic_sdk.providers.openai_responses import OpenAIResponsesProvider
+
+        provider = OpenAIResponsesProvider(stream_transport=stream_transport)
+        events = []
+        async for ev in provider.stream(
+            model="m",
+            input=[{"role": "user", "content": "hi"}],
+            tools=[],
+            api_key="k",
+        ):
+            events.append(ev)
+
+        done_events = [e for e in events if getattr(e, "type", None) == "done"]
+        self.assertEqual(len(done_events), 1)
+        self.assertEqual(getattr(done_events[0], "response_id", None), "resp_1")
+
 
 if __name__ == "__main__":
     unittest.main()

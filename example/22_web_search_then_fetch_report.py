@@ -2,16 +2,11 @@ from __future__ import annotations
 
 import asyncio
 
-from _common import example_artifact_dir, repo_root, require_env_simple, rightcode_options
+from _common import example_artifact_dir, repo_root, rightcode_options
 from openagentic_sdk.console import ConsoleRenderer, console_debug_enabled, console_query
 
 
 async def main() -> None:
-    require_env_simple(
-        "TAVILY_API_KEY",
-        help="This example uses the WebSearch tool (Tavily). Set TAVILY_API_KEY then rerun.",
-    )
-
     out_dir = example_artifact_dir("22")
     report_path = out_dir / "report.md"
 

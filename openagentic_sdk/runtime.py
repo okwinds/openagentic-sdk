@@ -118,6 +118,32 @@ def _unsupported_previous_response_id_error(e: BaseException) -> bool:
     return "previous_response_id" in msg_l and ("unsupported parameter" in msg_l or "unsupported" in msg_l)
 
 
+def _no_tool_call_found_for_call_output_error(e: BaseException) -> bool:
+    msg = str(e)
+    if not msg:
+        return False
+    msg_l = msg.lower()
+    return "no tool call found for function call output" in msg_l and "call_id" in msg_l
+
+
+def _looks_like_only_function_call_output(items: Sequence[Mapping[str, Any]]) -> bool:
+    return bool(items) and all(isinstance(i, dict) and i.get("type") == "function_call_output" for i in items)
+
+
+def _prepend_function_calls_for_responses(tool_calls: Sequence[ToolCall], outputs: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    calls: list[Mapping[str, Any]] = []
+    for tc in tool_calls:
+        calls.append(
+            {
+                "type": "function_call",
+                "call_id": tc.tool_use_id,
+                "name": tc.name,
+                "arguments": json.dumps(tc.arguments, ensure_ascii=False),
+            }
+        )
+    return calls + list(outputs)
+
+
 @dataclass(frozen=True, slots=True)
 class RunResult:
     final_text: str
@@ -150,6 +176,8 @@ class AgentRuntime:
 
         previous_response_id: str | None = None
         supports_previous_response_id = True
+        pending_responses_tool_calls: list[ToolCall] = []
+        pending_responses_history: list[Mapping[str, Any]] = []
         resume_protocol: str | None = None
         if options.resume:
             session_id = options.resume
@@ -418,18 +446,32 @@ class AgentRuntime:
                                     stream_usage = u
                                 break
                     except RuntimeError as e:
+                        can_retry_prev = (
+                            supports_previous_response_id
+                            and previous_response_id is not None
+                            and _unsupported_previous_response_id_error(e)
+                        )
+                        can_retry_link = supports_previous_response_id and _no_tool_call_found_for_call_output_error(e)
                         can_retry = (
                             provider_protocol != "legacy"
                             and attempt == 0
                             and supports_previous_response_id
-                            and previous_response_id is not None
                             and not parts
                             and not tool_calls
                             and stream_response_id is None
-                            and _unsupported_previous_response_id_error(e)
+                            and (can_retry_prev or can_retry_link)
                         )
                         if can_retry:
                             supports_previous_response_id = False
+                            if (
+                                pending_responses_tool_calls
+                                and pending_responses_history
+                                and _looks_like_only_function_call_output(messages)
+                            ):
+                                messages = [
+                                    *list(pending_responses_history),
+                                    *_prepend_function_calls_for_responses(pending_responses_tool_calls, messages),
+                                ]
                             continue
                         raise
                     break
@@ -477,13 +519,24 @@ class AgentRuntime:
                         if provider_protocol is None:
                             provider_protocol = "responses"
                     except RuntimeError as e:
-                        can_retry = (
+                        can_retry_prev = (
                             supports_previous_response_id
                             and previous_response_id is not None
                             and _unsupported_previous_response_id_error(e)
                         )
+                        can_retry_link = supports_previous_response_id and _no_tool_call_found_for_call_output_error(e)
+                        can_retry = can_retry_prev or can_retry_link
                         if can_retry:
                             supports_previous_response_id = False
+                            if (
+                                pending_responses_tool_calls
+                                and pending_responses_history
+                                and _looks_like_only_function_call_output(messages)
+                            ):
+                                messages = [
+                                    *list(pending_responses_history),
+                                    *_prepend_function_calls_for_responses(pending_responses_tool_calls, messages),
+                                ]
                             model_out = await options.provider.complete(
                                 model=options.model,
                                 input=messages,
@@ -537,6 +590,7 @@ class AgentRuntime:
 
             if model_out.tool_calls:
                 tool_calls = list(model_out.tool_calls)
+                pending_responses_tool_calls = tool_calls
                 if provider_protocol == "legacy":
                     # Record assistant tool-call message in OpenAI chat-completions format so tool results can link.
                     messages.append(
@@ -581,6 +635,7 @@ class AgentRuntime:
                                 )
                     if model_out.response_id:
                         previous_response_id = model_out.response_id
+                    pending_responses_history = list(messages)
                     messages = tool_output_items
                     continue
 

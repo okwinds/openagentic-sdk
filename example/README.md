@@ -18,12 +18,19 @@ Notes:
 - Examples that write files persist them under `.openagentic-sdk/example-artifacts/<example-id>/` and print the exact output path.
 - If RIGHTCODE returns transient `HTTP 502/503/504`, examples retry by default (`RIGHTCODE_MAX_RETRIES=2`, `RIGHTCODE_RETRY_BACKOFF_S=0.5`).
 
+## Troubleshooting
+
+- If you see `Unsupported parameter: previous_response_id` or `No tool call found for function call output with call_id ...`, your gateway does not support linking tool outputs via `previous_response_id`. Update the SDK; it will fall back to sending the tool calls + outputs inline.
+
 ## Output verbosity
 
 - Default: prints only the assistant text (human-friendly).
 - Debug: prints tool/hook/result summaries too.
   - CLI flag: `--debug`
-  - Env var: `OPENAGENTIC_SDK_CONSOLE_DEBUG=1`
+  - Env var: `OPENAGENTIC_SDK_CONSOLE_DEBUG=1` (or `OPENAGENTIC_SDK_EXAMPLE_DEBUG=1`)
+  - Windows PowerShell: `$env:OPENAGENTIC_SDK_CONSOLE_DEBUG="1"; python example/47_generate_faq_from_docs.py`
+  - Windows cmd.exe: `set OPENAGENTIC_SDK_CONSOLE_DEBUG=1 && python example/47_generate_faq_from_docs.py`
+  - bash/zsh: `OPENAGENTIC_SDK_CONSOLE_DEBUG=1 python3 example/47_generate_faq_from_docs.py`
 
 ## Core
 
