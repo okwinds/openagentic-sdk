@@ -11,6 +11,8 @@ from openagentic_sdk.sessions.store import FileSessionStore
 from .args import build_parser
 from .config import build_options
 from .logs_cmd import summarize_events
+from .mcp_cmd import cmd_mcp_auth, cmd_mcp_list, cmd_mcp_logout
+from .share_cmd import cmd_share, cmd_shared, cmd_unshare
 from .repl import run_chat
 from .run_cmd import run_once
 from .style import StyleConfig
@@ -79,6 +81,46 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.write(text)
         sys.stdout.flush()
         return 0
+
+    if ns.command == "share":
+        sid = str(getattr(ns, "session_id", "") or "")
+        root = getattr(ns, "session_root", None)
+        share_id = cmd_share(session_id=sid, session_root=str(root) if root else None)
+        sys.stdout.write(share_id + "\n")
+        sys.stdout.flush()
+        return 0
+
+    if ns.command == "unshare":
+        share_id = str(getattr(ns, "share_id", "") or "")
+        sys.stdout.write(cmd_unshare(share_id=share_id) + "\n")
+        sys.stdout.flush()
+        return 0
+
+    if ns.command == "shared":
+        share_id = str(getattr(ns, "share_id", "") or "")
+        sys.stdout.write(cmd_shared(share_id=share_id) + "\n")
+        sys.stdout.flush()
+        return 0
+
+    if ns.command == "mcp":
+        sub = getattr(ns, "mcp_command", None)
+        if sub == "list":
+            sys.stdout.write(cmd_mcp_list(cwd=cwd) + "\n")
+            sys.stdout.flush()
+            return 0
+        if sub == "auth":
+            name = str(getattr(ns, "name", "") or "")
+            token = str(getattr(ns, "token", "") or "")
+            sys.stdout.write(cmd_mcp_auth(name=name, token=token) + "\n")
+            sys.stdout.flush()
+            return 0
+        if sub == "logout":
+            name = str(getattr(ns, "name", "") or "")
+            sys.stdout.write(cmd_mcp_logout(name=name) + "\n")
+            sys.stdout.flush()
+            return 0
+        parser.error("missing or unknown mcp subcommand")
+        return 2
 
     parser.error(f"command not implemented: {ns.command}")
     return 2

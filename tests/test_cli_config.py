@@ -7,6 +7,7 @@ class TestCliConfig(unittest.TestCase):
         from openagentic_cli.config import build_options
 
         os.environ["RIGHTCODE_API_KEY"] = "x"
+        os.environ["OPENCODE_CONFIG_DIR"] = os.getcwd()  # isolate from user home config
         try:
             opts = build_options(
                 cwd=".",
@@ -17,11 +18,13 @@ class TestCliConfig(unittest.TestCase):
             self.assertEqual(opts.model, os.environ.get("RIGHTCODE_MODEL", "gpt-5.2"))
         finally:
             os.environ.pop("RIGHTCODE_API_KEY", None)
+            os.environ.pop("OPENCODE_CONFIG_DIR", None)
 
     def test_interactive_prompt_has_approver(self) -> None:
         from openagentic_cli.config import build_options
 
         os.environ["RIGHTCODE_API_KEY"] = "x"
+        os.environ["OPENCODE_CONFIG_DIR"] = os.getcwd()  # isolate from user home config
         try:
             opts = build_options(
                 cwd=".",
@@ -34,6 +37,7 @@ class TestCliConfig(unittest.TestCase):
             self.assertTrue(opts.include_partial_messages)
         finally:
             os.environ.pop("RIGHTCODE_API_KEY", None)
+            os.environ.pop("OPENCODE_CONFIG_DIR", None)
 
 
 if __name__ == "__main__":

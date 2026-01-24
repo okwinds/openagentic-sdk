@@ -23,3 +23,6 @@ class DoneEvent:
     type: Literal["done"] = "done"
     response_id: str | None = None
     usage: Mapping[str, Any] | None = None
+
+
+StreamEvent = TextDeltaEvent | ToolCallEvent | DoneEvent

@@ -14,6 +14,7 @@ from .todo_write import TodoWriteTool
 from .web_fetch import WebFetchTool
 from .web_search_tavily import WebSearchTool
 from .write import WriteTool
+from .lsp import LspTool
 
 
 def default_tool_registry() -> ToolRegistry:
@@ -32,5 +33,6 @@ def default_tool_registry() -> ToolRegistry:
             SlashCommandTool(),
             SkillTool(),
             TodoWriteTool(),
+            LspTool(),
         ]
     )

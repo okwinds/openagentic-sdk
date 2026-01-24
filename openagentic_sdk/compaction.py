@@ -1,0 +1,165 @@
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from typing import Any, Mapping
+
+from .events import AssistantMessage, Event, ToolOutputCompacted, ToolResult
+from .options import CompactionOptions
+
+
+COMPACTION_SYSTEM_PROMPT = """You are a helpful AI assistant tasked with summarizing conversations.
+
+When asked to summarize, provide a detailed but concise summary of the conversation.
+Focus on information that would be helpful for continuing the conversation, including:
+- What was done
+- What is currently being worked on
+- Which files are being modified
+- What needs to be done next
+- Key user requests, constraints, or preferences that should persist
+- Important technical decisions and why they were made
+
+Your summary should be comprehensive enough to provide context but concise enough to be quickly understood.
+""".strip()
+
+
+COMPACTION_MARKER_QUESTION = "What did we do so far?"
+
+
+COMPACTION_USER_INSTRUCTION = (
+    "Provide a detailed prompt for continuing our conversation above. Focus on information that would be helpful for "
+    "continuing the conversation, including what we did, what we're doing, which files we're working on, and what we're "
+    "going to do next considering new session will not have access to our conversation."
+)
+
+
+TOOL_OUTPUT_PLACEHOLDER = "[Old tool result content cleared]"
+
+
+@dataclass(frozen=True, slots=True)
+class UsageTotals:
+    input_tokens: int
+    output_tokens: int
+    cache_read_tokens: int
+    total_tokens: int
+
+
+def _int(v: Any) -> int:
+    try:
+        return int(v)
+    except Exception:  # noqa: BLE001
+        return 0
+
+
+def parse_usage_totals(usage: Mapping[str, Any] | None) -> UsageTotals | None:
+    if not isinstance(usage, dict) or not usage:
+        return None
+
+    input_tokens = _int(usage.get("input_tokens") or usage.get("prompt_tokens"))
+    output_tokens = _int(usage.get("output_tokens") or usage.get("completion_tokens"))
+    cache_read_tokens = _int(usage.get("cache_read_tokens") or usage.get("cached_tokens"))
+    total_tokens = _int(usage.get("total_tokens"))
+
+    if total_tokens <= 0:
+        total_tokens = input_tokens + output_tokens + cache_read_tokens
+
+    if total_tokens <= 0:
+        return None
+
+    return UsageTotals(
+        input_tokens=max(0, input_tokens),
+        output_tokens=max(0, output_tokens),
+        cache_read_tokens=max(0, cache_read_tokens),
+        total_tokens=max(0, total_tokens),
+    )
+
+
+def would_overflow(*, compaction: CompactionOptions, usage: Mapping[str, Any] | None) -> bool:
+    totals = parse_usage_totals(usage)
+    if totals is None:
+        return False
+
+    context_limit = int(compaction.context_limit or 0)
+    if context_limit <= 0:
+        return False
+
+    output_cap = int(compaction.global_output_cap or 0)
+    output_limit = compaction.output_limit
+    output_reserve = min(int(output_limit), output_cap) if isinstance(output_limit, int) and output_limit > 0 else output_cap
+    usable = context_limit - max(0, output_reserve)
+    if usable <= 0:
+        return True
+
+    return totals.total_tokens > usable
+
+
+def estimate_tokens(text: str) -> int:
+    # Lightweight heuristic (portable): tokens ~= chars/4.
+    if not text:
+        return 0
+    return max(1, len(text) // 4)
+
+
+def _safe_json_dumps(obj: Any) -> str:
+    try:
+        return json.dumps(obj, ensure_ascii=False)
+    except Exception:  # noqa: BLE001
+        return str(obj)
+
+
+def _filter_to_latest_summary_pivot(events: list[Event]) -> list[Event]:
+    last_summary_idx: int | None = None
+    for i, e in enumerate(events):
+        if isinstance(e, AssistantMessage) and bool(getattr(e, "is_summary", False)):
+            last_summary_idx = i
+    if last_summary_idx is None:
+        return events
+    return events[last_summary_idx:]
+
+
+def select_tool_outputs_to_prune(*, events: list[Event], compaction: CompactionOptions) -> list[str]:
+    """Return tool_use_ids to compact (append-only via ToolOutputCompacted events).
+
+    This implements the portable pruning strategy described in COMPACTION.md.
+    """
+
+    if not compaction.prune:
+        return []
+
+    events2 = _filter_to_latest_summary_pivot(events)
+
+    compacted_ids: set[str] = set()
+    for e in events2:
+        if isinstance(e, ToolOutputCompacted):
+            tid = getattr(e, "tool_use_id", "")
+            if isinstance(tid, str) and tid:
+                compacted_ids.add(tid)
+
+    protect = max(0, int(compaction.protect_tool_output_tokens or 0))
+    min_prune = max(0, int(compaction.min_prune_tokens or 0))
+
+    total = 0
+    to_prune: list[tuple[str, int]] = []
+
+    # Walk backwards through tool results since the latest pivot.
+    for e in reversed(events2):
+        if not isinstance(e, ToolResult):
+            continue
+        tid = e.tool_use_id
+        if not isinstance(tid, str) or not tid:
+            continue
+
+        # Idempotence boundary: once we hit an already-compacted tool result,
+        # stop scanning older results to avoid churn.
+        if tid in compacted_ids:
+            break
+
+        cost = estimate_tokens(_safe_json_dumps(e.output))
+        total += cost
+        if total > protect:
+            to_prune.append((tid, cost))
+
+    prunable_tokens = sum(cost for _, cost in to_prune)
+    if prunable_tokens < min_prune:
+        return []
+    return [tid for tid, _ in to_prune]

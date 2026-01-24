@@ -11,12 +11,18 @@ from .errors import InvalidEventError, UnknownEventTypeError
 _TYPE_MAP: Mapping[str, Type[events.EventBase]] = {
     "system.init": events.SystemInit,
     "user.message": events.UserMessage,
+    "user.compaction": events.UserCompaction,
     "user.question": events.UserQuestion,
     "assistant.delta": events.AssistantDelta,
     "assistant.message": events.AssistantMessage,
     "tool.use": events.ToolUse,
     "tool.result": events.ToolResult,
+    "tool.output_compacted": events.ToolOutputCompacted,
     "hook.event": events.HookEvent,
+    "session.checkpoint": events.SessionCheckpoint,
+    "session.set_head": events.SessionSetHead,
+    "session.undo": events.SessionUndo,
+    "session.redo": events.SessionRedo,
     "result": events.Result,
 }
 

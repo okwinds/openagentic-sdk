@@ -33,6 +33,21 @@ class UserMessage(EventBase):
 
 
 @dataclass(frozen=True, slots=True)
+class UserCompaction(EventBase):
+    """A marker event that schedules a compaction pass.
+
+    We keep sessions append-only, so compaction-related state changes are
+    represented as explicit events.
+    """
+
+    type: Literal["user.compaction"] = "user.compaction"
+    auto: bool = False
+    reason: str | None = None
+    parent_tool_use_id: str | None = None
+    agent_name: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class UserQuestion(EventBase):
     type: Literal["user.question"] = "user.question"
     question_id: str = ""
@@ -54,6 +69,7 @@ class AssistantDelta(EventBase):
 class AssistantMessage(EventBase):
     type: Literal["assistant.message"] = "assistant.message"
     text: str = ""
+    is_summary: bool = False
     parent_tool_use_id: str | None = None
     agent_name: str | None = None
 
@@ -76,6 +92,21 @@ class ToolResult(EventBase):
     is_error: bool = False
     error_type: str | None = None
     error_message: str | None = None
+    parent_tool_use_id: str | None = None
+    agent_name: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ToolOutputCompacted(EventBase):
+    """Marks a previous tool.result output as compacted for model input.
+
+    The underlying tool output remains in storage; this event only affects how
+    we rebuild future model inputs.
+    """
+
+    type: Literal["tool.output_compacted"] = "tool.output_compacted"
+    tool_use_id: str = ""
+    compacted_ts: float | None = None
     parent_tool_use_id: str | None = None
     agent_name: str | None = None
 
@@ -104,14 +135,63 @@ class HookEvent(EventBase):
     action: str | None = None
 
 
+# Session timeline controls (append-only).
+
+
+@dataclass(frozen=True, slots=True)
+class SessionCheckpoint(EventBase):
+    """A named checkpoint of the current session head.
+
+    `head_seq` refers to the last applied event sequence number at the moment
+    the checkpoint was created.
+    """
+
+    type: Literal["session.checkpoint"] = "session.checkpoint"
+    label: str = ""
+    head_seq: int = 0
+    parent_tool_use_id: str | None = None
+    agent_name: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SessionSetHead(EventBase):
+    """Move the session head to an earlier seq (append-only revert)."""
+
+    type: Literal["session.set_head"] = "session.set_head"
+    head_seq: int = 0
+    reason: str | None = None
+    parent_tool_use_id: str | None = None
+    agent_name: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SessionUndo(EventBase):
+    type: Literal["session.undo"] = "session.undo"
+    parent_tool_use_id: str | None = None
+    agent_name: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SessionRedo(EventBase):
+    type: Literal["session.redo"] = "session.redo"
+    parent_tool_use_id: str | None = None
+    agent_name: str | None = None
+
+
 Event = (
     SystemInit
     | UserMessage
+    | UserCompaction
     | UserQuestion
     | AssistantDelta
     | AssistantMessage
     | ToolUse
     | ToolResult
+    | ToolOutputCompacted
     | HookEvent
+    | SessionCheckpoint
+    | SessionSetHead
+    | SessionUndo
+    | SessionRedo
     | Result
 )

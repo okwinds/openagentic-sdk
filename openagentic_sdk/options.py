@@ -23,6 +23,28 @@ class AgentDefinition:
 
 
 @dataclass(frozen=True, slots=True)
+class CompactionOptions:
+    # Auto-compaction is only effective when `context_limit > 0`.
+    auto: bool = True
+    prune: bool = True
+
+    # Model context window size (tokens). If 0, treat as unlimited and do not auto-compact.
+    context_limit: int = 0
+
+    # Model max output tokens. If unset, we fall back to `global_output_cap`.
+    output_limit: int | None = None
+
+    # Product-level cap on output tokens reserved from the context window.
+    global_output_cap: int = 4096
+
+    # Soft compaction: keep this many estimated tool-output tokens unpruned.
+    protect_tool_output_tokens: int = 40_000
+
+    # Only apply pruning if we'd prune at least this many estimated tokens.
+    min_prune_tokens: int = 20_000
+
+
+@dataclass(frozen=True, slots=True)
 class OpenAgenticOptions:
     provider: Provider
     model: str
@@ -48,6 +70,19 @@ class OpenAgenticOptions:
 
     setting_sources: Sequence[str] = ()
     project_dir: str | None = None
+
+    # First-class system prompt injection (programmatic).
+    # This is intentionally distinct from `.claude/CLAUDE.md` project memory.
+    system_prompt: str | None = None
+
+    # Extra instruction files to inject into the system prompt.
+    # Entries are treated as paths (relative to `project_dir`/`cwd`) and may include glob patterns.
+    instruction_files: Sequence[str] = ()
+
+    # Compaction (context overflow handling). Defaults are aligned with the
+    # COMPACTION.md portable design, but auto-triggering requires a non-zero
+    # `context_limit`.
+    compaction: CompactionOptions = field(default_factory=CompactionOptions)
 
     agents: Mapping[str, AgentDefinition] = field(default_factory=dict)
 

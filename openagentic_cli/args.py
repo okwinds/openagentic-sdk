@@ -27,6 +27,33 @@ def build_parser() -> argparse.ArgumentParser:
         help="Session root directory (default: ~/.openagentic-sdk; env: OPENAGENTIC_SDK_HOME)",
     )
 
+    p_mcp = sub.add_parser("mcp", help="Manage MCP servers and credentials")
+    mcp_sub = p_mcp.add_subparsers(dest="mcp_command")
+
+    p_mcp_list = mcp_sub.add_parser("list", help="List MCP servers from config")
+    _ = p_mcp_list
+
+    p_mcp_auth = mcp_sub.add_parser("auth", help="Store a bearer token for a remote MCP server")
+    p_mcp_auth.add_argument("name", help="MCP server name (key under config.mcp)")
+    p_mcp_auth.add_argument("--token", required=True, help="Bearer token")
+
+    p_mcp_logout = mcp_sub.add_parser("logout", help="Clear stored credentials for an MCP server")
+    p_mcp_logout.add_argument("name", help="MCP server name (key under config.mcp)")
+
+    p_share = sub.add_parser("share", help="Share a session (offline/local by default)")
+    p_share.add_argument("session_id", help="Session id to share")
+    p_share.add_argument(
+        "--session-root",
+        default=None,
+        help="Session root directory (default: ~/.openagentic-sdk; env: OPENAGENTIC_SDK_HOME)",
+    )
+
+    p_unshare = sub.add_parser("unshare", help="Remove a shared session payload")
+    p_unshare.add_argument("share_id", help="Share id to remove")
+
+    p_shared = sub.add_parser("shared", help="Print a shared session payload")
+    p_shared.add_argument("share_id", help="Share id to fetch")
+
     return parser
 
 
