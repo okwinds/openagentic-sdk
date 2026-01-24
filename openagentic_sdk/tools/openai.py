@@ -48,10 +48,37 @@ def tool_schemas_for_openai(
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "questions": {"type": "array", "items": {"type": "object"}},
+                        # Preferred shape (multi-question batch):
+                        "questions": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "question": {"type": "string"},
+                                    "header": {"type": "string"},
+                                    "options": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "label": {"type": "string"},
+                                                "description": {"type": "string"},
+                                            },
+                                            "required": ["label"],
+                                        },
+                                    },
+                                    "multiple": {"type": "boolean"},
+                                    "multiSelect": {"type": "boolean"},
+                                },
+                                "required": ["question"],
+                            },
+                        },
+                        # Common single-question calling style (runtime normalizes to `questions=[...]`):
+                        "question": {"type": "string"},
+                        "options": {"type": "array", "items": {"type": "string"}},
+                        "choices": {"type": "array", "items": {"type": "string"}},
                         "answers": {"type": "object"},
                     },
-                    "required": ["questions"],
                 },
             },
         },

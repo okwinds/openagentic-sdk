@@ -42,6 +42,32 @@ class AskProvider:
         ans = (data.get("answers") or {}).get("Pick one")
         return ModelOutput(assistant_text=f"answer={ans}", tool_calls=[])
 
+class AskProviderSingle:
+    name = "fake"
+
+    async def complete(self, *, model, messages, tools=(), api_key=None):
+        _ = (model, tools, api_key)
+        if not any(m.get("role") == "tool" for m in messages):
+            # Common-model calling style: single question at top-level.
+            return ModelOutput(
+                assistant_text=None,
+                tool_calls=[
+                    ToolCall(
+                        tool_use_id="call_1",
+                        name="AskUserQuestion",
+                        arguments={
+                            "question": "Pick one",
+                            "options": ["A", "B"],
+                        },
+                    )
+                ],
+            )
+        tool_msg = next(m for m in messages if m.get("role") == "tool")
+        data = json.loads(tool_msg.get("content") or "{}")
+        payload = data if isinstance(data, dict) else {}
+        ans = (payload.get("answers") or {}).get("Pick one")
+        return ModelOutput(assistant_text=f"answer={ans}", tool_calls=[])
+
 
 class TestAskUserQuestionTool(unittest.IsolatedAsyncioTestCase):
     async def test_runtime_asks_and_returns_answer(self) -> None:
@@ -67,7 +93,29 @@ class TestAskUserQuestionTool(unittest.IsolatedAsyncioTestCase):
             r = await openagentic_sdk.run(prompt="hi", options=options)
             self.assertIn("answer=A", r.final_text)
 
+    async def test_runtime_accepts_single_question_shape(self) -> None:
+        async def user_answerer(q):  # noqa: ANN001
+            _ = q
+            return "A"
+
+        with TemporaryDirectory() as td:
+            root = Path(td)
+            store = FileSessionStore(root_dir=root)
+            options = OpenAgenticOptions(
+                provider=AskProviderSingle(),
+                model="m",
+                api_key="x",
+                cwd=str(root),
+                permission_gate=PermissionGate(permission_mode="bypass", user_answerer=user_answerer),
+                session_store=store,
+                allowed_tools=["AskUserQuestion"],
+            )
+
+            import openagentic_sdk
+
+            r = await openagentic_sdk.run(prompt="hi", options=options)
+            self.assertIn("answer=A", r.final_text)
+
 
 if __name__ == "__main__":
     unittest.main()
-

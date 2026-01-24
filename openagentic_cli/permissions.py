@@ -20,6 +20,7 @@ _SAFE_TOOLS: set[str] = {
     "Skill",
     "SlashCommand",
     "TodoWrite",
+    "AskUserQuestion",
 }
 
 _AUTO_TOOLS: set[str] = {

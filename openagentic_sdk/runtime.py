@@ -540,6 +540,25 @@ class AgentRuntime:
 
         if tool_name == "AskUserQuestion":
             questions = tool_input2.get("questions")
+            if isinstance(questions, dict):
+                questions = [questions]
+
+            if not isinstance(questions, list) or not questions:
+                q_text0 = tool_input2.get("question", tool_input2.get("prompt"))
+                if isinstance(q_text0, str) and q_text0.strip():
+                    opts0 = tool_input2.get("options", tool_input2.get("choices")) or []
+                    options0: list[dict[str, str]] = []
+                    if isinstance(opts0, list):
+                        for opt in opts0:
+                            if isinstance(opt, str) and opt.strip():
+                                options0.append({"label": opt.strip()})
+                                continue
+                            if isinstance(opt, dict):
+                                lab = opt.get("label", opt.get("name", opt.get("value")))
+                                if isinstance(lab, str) and lab.strip():
+                                    options0.append({"label": lab.strip()})
+                    questions = [{"question": q_text0.strip(), "options": options0}]
+
             if not isinstance(questions, list) or not questions:
                 result = ToolResult(
                     tool_use_id=tool_call.tool_use_id,

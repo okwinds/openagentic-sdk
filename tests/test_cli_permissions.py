@@ -17,6 +17,17 @@ class TestCliPermissions(unittest.TestCase):
         res = asyncio.run(gate.approve("Read", {"file_path": "x"}, context={}))
         self.assertTrue(res.allowed)
 
+    def test_ask_user_question_is_allowed(self) -> None:
+        policy = CliPermissionPolicy(
+            cwd=Path("."),
+            auto_root=Path("."),
+            auto_allow_dangerous=False,
+            prompt_fn=lambda _p: (_ for _ in ()).throw(AssertionError("should not prompt")),
+        )
+        gate = build_permission_gate(policy)
+        res = asyncio.run(gate.approve("AskUserQuestion", {"questions": [{"question": "Q", "options": [{"label": "A"}]}]}, context={}))
+        self.assertTrue(res.allowed)
+
     def test_auto_allows_write_in_tree(self) -> None:
         policy = CliPermissionPolicy(
             cwd=Path("/repo"),
