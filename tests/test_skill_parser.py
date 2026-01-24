@@ -2,7 +2,6 @@ import unittest
 
 from openagentic_sdk.skills.parse import parse_skill_markdown
 
-
 SKILL_MD = """# skill-example
 
 One line summary.

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import inspect
 import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, AsyncIterator, Mapping, Sequence
 
+from ._version import __version__ as _SDK_VERSION
 from .events import (
     AssistantDelta,
     AssistantMessage,
@@ -17,18 +19,72 @@ from .events import (
     UserQuestion,
 )
 from .hooks.engine import HookEngine
+from .mcp.sdk import McpSdkServerConfig, wrap_sdk_server_tools
 from .options import OpenAgenticOptions
-from .providers.base import ModelOutput, ToolCall
+from .paths import default_session_root
 from .project.claude import load_claude_project_settings
-from .skills.index import index_skills
+from .providers.base import ModelOutput, ToolCall
 from .sessions.rebuild import rebuild_messages, rebuild_responses_input
 from .sessions.store import FileSessionStore
+from .skills.index import index_skills
 from .tools.base import ToolContext
 from .tools.openai import tool_schemas_for_openai
 from .tools.openai_responses import tool_schemas_for_responses
-from .mcp.sdk import McpSdkServerConfig, wrap_sdk_server_tools
-from ._version import __version__ as _SDK_VERSION
-from .paths import default_session_root
+from .tools.task import TaskTool
+
+
+def _callable_accepts_kw(fn: Any, name: str) -> bool:
+    try:
+        sig = inspect.signature(fn)
+    except Exception:  # noqa: BLE001
+        return False
+    if name in sig.parameters:
+        return True
+    return any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+
+
+def _filter_supported_kwargs(fn: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
+    """Drop kwargs a callable doesn't accept.
+
+    This avoids runtime TypeErrors and lets custom providers implement only a
+    subset of the Responses API keyword surface.
+    """
+
+    try:
+        sig = inspect.signature(fn)
+    except Exception:  # noqa: BLE001
+        return kwargs
+    if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()):
+        return kwargs
+    allowed = set(sig.parameters.keys())
+    return {k: v for k, v in kwargs.items() if k in allowed}
+
+
+def _detect_provider_protocol(provider: Any) -> str:
+    """Best-effort protocol detection based on provider call signatures.
+
+    We prefer to detect via `complete()` (used for non-streaming providers), but
+    fall back to `stream()` when a provider only supports streaming.
+    """
+
+    for attr in ("complete", "stream"):
+        fn = getattr(provider, attr, None)
+        if fn is None:
+            continue
+        try:
+            sig = inspect.signature(fn)
+        except Exception:  # noqa: BLE001
+            continue
+        params = sig.parameters
+        if "input" in params:
+            return "responses"
+        if "messages" in params:
+            return "legacy"
+        if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()):
+            # Prefer modern protocol when the provider is flexible.
+            return "responses"
+
+    return "responses"
 
 
 def _default_session_root() -> Path:
@@ -169,6 +225,13 @@ class AgentRuntime:
                         except KeyError:
                             options.tools.register(wrapper)
 
+        # Expose Task only when agents are configured.
+        if options.agents:
+            try:
+                options.tools.get("Task")
+            except KeyError:
+                options.tools.register(TaskTool())
+
         store = options.session_store
         if store is None:
             root = options.session_root or _default_session_root()
@@ -282,7 +345,7 @@ class AgentRuntime:
         )
 
         messages.append({"role": "user", "content": prompt3})
-        provider_protocol: str | None = None  # "responses" | "legacy"
+        provider_protocol: str = resume_protocol or _detect_provider_protocol(options.provider)
         steps = 0
         while steps < options.max_steps:
             if options.abort_event is not None and getattr(options.abort_event, "is_set", lambda: False)():
@@ -304,7 +367,7 @@ class AgentRuntime:
                 return
             steps += 1
             tool_names = options.tools.names()
-            if options.agents:
+            if options.agents and "Task" not in set(tool_names):
                 tool_names = [*tool_names, "Task"]
             if options.allowed_tools is not None:
                 allowed = set(options.allowed_tools)
@@ -361,7 +424,7 @@ class AgentRuntime:
 
             model_out: ModelOutput
             if hasattr(options.provider, "stream"):
-                stream_fn = getattr(options.provider, "stream")
+                stream_fn: Any = getattr(options.provider, "stream")
                 interrupted = False
                 parts: list[str] = []
                 tool_calls: list[ToolCall] = []
@@ -375,35 +438,25 @@ class AgentRuntime:
                     stream_usage = None
 
                     if provider_protocol == "legacy":
-                        stream_iter = stream_fn(
-                            model=options.model, messages=messages, tools=tool_schemas, api_key=options.api_key
-                        )
+                        kwargs = {
+                            "model": options.model,
+                            "messages": messages,
+                            "tools": tool_schemas,
+                            "api_key": options.api_key,
+                        }
+                        stream_iter = stream_fn(**_filter_supported_kwargs(stream_fn, kwargs))
                     else:
-                        prev_id = previous_response_id if supports_previous_response_id else None
-                        try:
-                            stream_iter = stream_fn(
-                                model=options.model,
-                                input=messages,
-                                tools=tool_schemas,
-                                api_key=options.api_key,
-                                previous_response_id=prev_id,
-                                store=True,
-                            )
-                            if provider_protocol is None:
-                                provider_protocol = "responses"
-                        except TypeError as e:
-                            if provider_protocol is None and "unexpected keyword argument" in str(e):
-                                provider_protocol = "legacy"
-                                tool_schemas = tool_schemas_for_openai(
-                                    tool_names,
-                                    registry=options.tools,
-                                    context={"cwd": options.cwd, "project_dir": options.project_dir},
-                                )
-                                stream_iter = stream_fn(
-                                    model=options.model, messages=messages, tools=tool_schemas, api_key=options.api_key
-                                )
-                            else:
-                                raise
+                        can_thread = supports_previous_response_id and _callable_accepts_kw(stream_fn, "previous_response_id")
+                        prev_id = previous_response_id if can_thread else None
+                        kwargs = {
+                            "model": options.model,
+                            "input": messages,
+                            "tools": tool_schemas,
+                            "api_key": options.api_key,
+                            "previous_response_id": prev_id,
+                            "store": True,
+                        }
+                        stream_iter = stream_fn(**_filter_supported_kwargs(stream_fn, kwargs))
 
                     try:
                         async for ev in stream_iter:
@@ -498,26 +551,27 @@ class AgentRuntime:
                     response_id=stream_response_id,
                 )
             else:
+                complete_fn: Any = getattr(options.provider, "complete")
                 if provider_protocol == "legacy":
-                    model_out = await options.provider.complete(
-                        model=options.model,
-                        messages=messages,
-                        tools=tool_schemas,
-                        api_key=options.api_key,
-                    )
+                    kwargs = {
+                        "model": options.model,
+                        "messages": messages,
+                        "tools": tool_schemas,
+                        "api_key": options.api_key,
+                    }
+                    model_out = await complete_fn(**_filter_supported_kwargs(complete_fn, kwargs))
                 else:
                     prev_id = previous_response_id if supports_previous_response_id else None
                     try:
-                        model_out = await options.provider.complete(
-                            model=options.model,
-                            input=messages,
-                            tools=tool_schemas,
-                            api_key=options.api_key,
-                            previous_response_id=prev_id,
-                            store=True,
-                        )
-                        if provider_protocol is None:
-                            provider_protocol = "responses"
+                        kwargs = {
+                            "model": options.model,
+                            "input": messages,
+                            "tools": tool_schemas,
+                            "api_key": options.api_key,
+                            "previous_response_id": prev_id,
+                            "store": True,
+                        }
+                        model_out = await complete_fn(**_filter_supported_kwargs(complete_fn, kwargs))
                     except RuntimeError as e:
                         can_retry_prev = (
                             supports_previous_response_id
@@ -526,45 +580,28 @@ class AgentRuntime:
                         )
                         can_retry_link = supports_previous_response_id and _no_tool_call_found_for_call_output_error(e)
                         can_retry = can_retry_prev or can_retry_link
-                        if can_retry:
-                            supports_previous_response_id = False
-                            if (
-                                pending_responses_tool_calls
-                                and pending_responses_history
-                                and _looks_like_only_function_call_output(messages)
-                            ):
-                                messages = [
-                                    *list(pending_responses_history),
-                                    *_prepend_function_calls_for_responses(pending_responses_tool_calls, messages),
-                                ]
-                            model_out = await options.provider.complete(
-                                model=options.model,
-                                input=messages,
-                                tools=tool_schemas,
-                                api_key=options.api_key,
-                                previous_response_id=None,
-                                store=True,
-                            )
-                            if provider_protocol is None:
-                                provider_protocol = "responses"
-                        else:
+                        if not can_retry:
                             raise
-                    except TypeError as e:
-                        if provider_protocol is None and "unexpected keyword argument" in str(e):
-                            provider_protocol = "legacy"
-                            tool_schemas = tool_schemas_for_openai(
-                                tool_names,
-                                registry=options.tools,
-                                context={"cwd": options.cwd, "project_dir": options.project_dir},
-                            )
-                            model_out = await options.provider.complete(
-                                model=options.model,
-                                messages=messages,
-                                tools=tool_schemas,
-                                api_key=options.api_key,
-                            )
-                        else:
-                            raise
+
+                        supports_previous_response_id = False
+                        if (
+                            pending_responses_tool_calls
+                            and pending_responses_history
+                            and _looks_like_only_function_call_output(messages)
+                        ):
+                            messages = [
+                                *list(pending_responses_history),
+                                *_prepend_function_calls_for_responses(pending_responses_tool_calls, messages),
+                            ]
+                        kwargs = {
+                            "model": options.model,
+                            "input": messages,
+                            "tools": tool_schemas,
+                            "api_key": options.api_key,
+                            "previous_response_id": None,
+                            "store": True,
+                        }
+                        model_out = await complete_fn(**_filter_supported_kwargs(complete_fn, kwargs))
             model_out2, hook_events2, decision2 = await options.hooks.run_after_model_call(
                 output=model_out, context=model_ctx
             )
@@ -730,6 +767,338 @@ class AgentRuntime:
         store.append_event(session_id, final)
         yield final
 
+    async def _handle_ask_user_question(
+        self,
+        *,
+        session_id: str,
+        tool_call: ToolCall,
+        tool_input: Mapping[str, Any],
+        store: FileSessionStore,
+    ) -> AsyncIterator[Any]:
+        options = self._options
+
+        questions = tool_input.get("questions")
+        if isinstance(questions, dict):
+            questions = [questions]
+
+        if not isinstance(questions, list) or not questions:
+            q_text0 = tool_input.get("question", tool_input.get("prompt"))
+            if isinstance(q_text0, str) and q_text0.strip():
+                opts0 = tool_input.get("options", tool_input.get("choices")) or []
+                options0: list[dict[str, str]] = []
+                if isinstance(opts0, list):
+                    for opt in opts0:
+                        if isinstance(opt, str) and opt.strip():
+                            options0.append({"label": opt.strip()})
+                            continue
+                        if isinstance(opt, dict):
+                            lab = opt.get("label", opt.get("name", opt.get("value")))
+                            if isinstance(lab, str) and lab.strip():
+                                options0.append({"label": lab.strip()})
+                questions = [{"question": q_text0.strip(), "options": options0}]
+
+        if not isinstance(questions, list) or not questions:
+            result = ToolResult(
+                tool_use_id=tool_call.tool_use_id,
+                output=None,
+                is_error=True,
+                error_type="InvalidAskUserQuestionInput",
+                error_message="AskUserQuestion: 'questions' must be a non-empty list",
+                parent_tool_use_id=self._parent_tool_use_id,
+                agent_name=self._agent_name,
+            )
+            store.append_event(session_id, result)
+            yield result
+            return
+
+        user_answerer = options.permission_gate.user_answerer
+        if user_answerer is None:
+            result = ToolResult(
+                tool_use_id=tool_call.tool_use_id,
+                output=None,
+                is_error=True,
+                error_type="NoUserAnswerer",
+                error_message="AskUserQuestion: no user_answerer is configured",
+                parent_tool_use_id=self._parent_tool_use_id,
+                agent_name=self._agent_name,
+            )
+            store.append_event(session_id, result)
+            yield result
+            return
+
+        answers: dict[str, str] = {}
+        for i, q in enumerate(questions):
+            if not isinstance(q, dict):
+                continue
+            q_text = q.get("question")
+            if not isinstance(q_text, str) or not q_text:
+                continue
+            opts = q.get("options") or []
+            labels: list[str] = []
+            if isinstance(opts, list):
+                for opt in opts:
+                    if isinstance(opt, dict):
+                        lab = opt.get("label")
+                        if isinstance(lab, str) and lab:
+                            labels.append(lab)
+            if not labels:
+                labels = ["ok"]
+
+            uq = UserQuestion(
+                question_id=f"{tool_call.tool_use_id}:{i}",
+                prompt=q_text,
+                choices=labels,
+                parent_tool_use_id=self._parent_tool_use_id,
+                agent_name=self._agent_name,
+            )
+            store.append_event(session_id, uq)
+            yield uq
+            ans = await user_answerer(uq)
+            answers[q_text] = str(ans)
+
+        result = ToolResult(
+            tool_use_id=tool_call.tool_use_id,
+            output={"questions": questions, "answers": answers},
+            is_error=False,
+            parent_tool_use_id=self._parent_tool_use_id,
+            agent_name=self._agent_name,
+        )
+        store.append_event(session_id, result)
+        yield result
+
+    async def _handle_task_tool(
+        self,
+        *,
+        session_id: str,
+        tool_call: ToolCall,
+        tool_input: Mapping[str, Any],
+        store: FileSessionStore,
+    ) -> AsyncIterator[Any]:
+        options = self._options
+
+        agent = tool_input.get("agent")
+        task_prompt = tool_input.get("prompt")
+        if not isinstance(agent, str) or not agent:
+            result = ToolResult(
+                tool_use_id=tool_call.tool_use_id,
+                output=None,
+                is_error=True,
+                error_type="InvalidTaskInput",
+                error_message="Task: 'agent' must be a non-empty string",
+                parent_tool_use_id=self._parent_tool_use_id,
+                agent_name=self._agent_name,
+            )
+            store.append_event(session_id, result)
+            yield result
+            return
+        if not isinstance(task_prompt, str) or not task_prompt:
+            result = ToolResult(
+                tool_use_id=tool_call.tool_use_id,
+                output=None,
+                is_error=True,
+                error_type="InvalidTaskInput",
+                error_message="Task: 'prompt' must be a non-empty string",
+                parent_tool_use_id=self._parent_tool_use_id,
+                agent_name=self._agent_name,
+            )
+            store.append_event(session_id, result)
+            yield result
+            return
+
+        definition = options.agents.get(agent)
+        if definition is None:
+            result = ToolResult(
+                tool_use_id=tool_call.tool_use_id,
+                output=None,
+                is_error=True,
+                error_type="UnknownAgent",
+                error_message=f"Unknown agent '{agent}'",
+                parent_tool_use_id=self._parent_tool_use_id,
+                agent_name=self._agent_name,
+            )
+            store.append_event(session_id, result)
+            yield result
+            return
+
+        child_session_id = store.create_session(
+            metadata={
+                "parent_session_id": session_id,
+                "parent_tool_use_id": tool_call.tool_use_id,
+                "agent_name": agent,
+            }
+        )
+        child_options = OpenAgenticOptions(
+            provider=definition.provider or options.provider,
+            model=definition.model or options.model,
+            api_key=options.api_key,
+            cwd=options.cwd,
+            max_steps=options.max_steps,
+            timeout_s=options.timeout_s,
+            tools=options.tools,
+            allowed_tools=list(definition.tools) if definition.tools else options.allowed_tools,
+            permission_gate=options.permission_gate,
+            hooks=options.hooks,
+            session_store=store,
+            resume=child_session_id,
+            setting_sources=options.setting_sources,
+            agents=options.agents,
+        )
+
+        child_runtime = AgentRuntime(child_options, agent_name=agent, parent_tool_use_id=tool_call.tool_use_id)
+        combined_prompt = definition.prompt + "\n\n" + task_prompt
+        child_final_text = ""
+        async for child_event in child_runtime.query(combined_prompt):
+            store.append_event(session_id, child_event)
+            yield child_event
+            if isinstance(child_event, Result):
+                child_final_text = child_event.final_text
+
+        result = ToolResult(
+            tool_use_id=tool_call.tool_use_id,
+            output={"child_session_id": child_session_id, "final_text": child_final_text},
+            is_error=False,
+            parent_tool_use_id=self._parent_tool_use_id,
+            agent_name=self._agent_name,
+        )
+        store.append_event(session_id, result)
+        yield result
+
+    async def _handle_webfetch_prompt(
+        self,
+        *,
+        session_id: str,
+        tool_call: ToolCall,
+        tool_input: Mapping[str, Any],
+        store: FileSessionStore,
+        hooks: HookEngine,
+        ctx: Mapping[str, Any],
+    ) -> AsyncIterator[Any]:
+        options = self._options
+        tool_name = tool_call.name
+
+        prompt_text = tool_input.get("prompt")
+        if not isinstance(prompt_text, str) or not prompt_text:
+            return
+
+        try:
+            tool = options.tools.get(tool_name)
+            fetched = await tool.run(tool_input, ToolContext(cwd=options.cwd, project_dir=options.project_dir))
+            page_text = fetched.get("text", "") if isinstance(fetched, dict) else ""
+            if not isinstance(page_text, str):
+                page_text = str(page_text)
+
+            complete_fn: Any = getattr(options.provider, "complete")
+            protocol = _detect_provider_protocol(options.provider)
+            prompt_msg = {"role": "user", "content": f"{prompt_text}\n\nCONTENT:\n{page_text}"}
+            if protocol == "legacy":
+                kwargs = {
+                    "model": options.model,
+                    "messages": [prompt_msg],
+                    "tools": (),
+                    "api_key": options.api_key,
+                }
+            else:
+                kwargs = {
+                    "model": options.model,
+                    "input": [prompt_msg],
+                    "tools": (),
+                    "api_key": options.api_key,
+                    "store": True,
+                }
+            model_out = await complete_fn(**_filter_supported_kwargs(complete_fn, kwargs))
+            response = model_out.assistant_text or ""
+
+            output: dict[str, Any] = {
+                "response": response,
+                "url": fetched.get("url") if isinstance(fetched, dict) else tool_input.get("url"),
+                "final_url": fetched.get("url") if isinstance(fetched, dict) else None,
+                "status_code": fetched.get("status") if isinstance(fetched, dict) else None,
+            }
+            output2, post_events, post_decision = await hooks.run_post_tool_use(
+                tool_name=tool_name,
+                tool_output=output,
+                context=ctx,
+            )
+            for he in post_events:
+                store.append_event(session_id, he)
+                yield he
+            if post_decision is not None and post_decision.block:
+                raise RuntimeError(post_decision.block_reason or "blocked by hook")
+
+            result = ToolResult(
+                tool_use_id=tool_call.tool_use_id,
+                output=output2,
+                is_error=False,
+                parent_tool_use_id=self._parent_tool_use_id,
+                agent_name=self._agent_name,
+            )
+        except Exception as e:  # noqa: BLE001
+            result = ToolResult(
+                tool_use_id=tool_call.tool_use_id,
+                output=None,
+                is_error=True,
+                error_type=type(e).__name__,
+                error_message=str(e),
+                parent_tool_use_id=self._parent_tool_use_id,
+                agent_name=self._agent_name,
+            )
+
+        store.append_event(session_id, result)
+        yield result
+
+    async def _handle_todowrite(
+        self,
+        *,
+        session_id: str,
+        tool_call: ToolCall,
+        tool_input: Mapping[str, Any],
+        store: FileSessionStore,
+        hooks: HookEngine,
+        ctx: Mapping[str, Any],
+    ) -> AsyncIterator[Any]:
+        options = self._options
+        tool_name = tool_call.name
+
+        try:
+            tool = options.tools.get(tool_name)
+            output = await tool.run(tool_input, ToolContext(cwd=options.cwd, project_dir=options.project_dir))
+            todos = tool_input.get("todos")
+            if isinstance(todos, list):
+                p = store.session_dir(session_id) / "todos.json"
+                p.write_text(json.dumps({"todos": todos}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            output2, post_events, post_decision = await hooks.run_post_tool_use(
+                tool_name=tool_name,
+                tool_output=output,
+                context=ctx,
+            )
+            for he in post_events:
+                store.append_event(session_id, he)
+                yield he
+            if post_decision is not None and post_decision.block:
+                raise RuntimeError(post_decision.block_reason or "blocked by hook")
+
+            result = ToolResult(
+                tool_use_id=tool_call.tool_use_id,
+                output=output2,
+                is_error=False,
+                parent_tool_use_id=self._parent_tool_use_id,
+                agent_name=self._agent_name,
+            )
+        except Exception as e:  # noqa: BLE001
+            result = ToolResult(
+                tool_use_id=tool_call.tool_use_id,
+                output=None,
+                is_error=True,
+                error_type=type(e).__name__,
+                error_message=str(e),
+                parent_tool_use_id=self._parent_tool_use_id,
+                agent_name=self._agent_name,
+            )
+
+        store.append_event(session_id, result)
+        yield result
+
     async def _run_tool_call(
         self,
         *,
@@ -810,281 +1179,49 @@ class AgentRuntime:
         tool_input2 = approval.updated_input or tool_input2
 
         if tool_name == "AskUserQuestion":
-            questions = tool_input2.get("questions")
-            if isinstance(questions, dict):
-                questions = [questions]
-
-            if not isinstance(questions, list) or not questions:
-                q_text0 = tool_input2.get("question", tool_input2.get("prompt"))
-                if isinstance(q_text0, str) and q_text0.strip():
-                    opts0 = tool_input2.get("options", tool_input2.get("choices")) or []
-                    options0: list[dict[str, str]] = []
-                    if isinstance(opts0, list):
-                        for opt in opts0:
-                            if isinstance(opt, str) and opt.strip():
-                                options0.append({"label": opt.strip()})
-                                continue
-                            if isinstance(opt, dict):
-                                lab = opt.get("label", opt.get("name", opt.get("value")))
-                                if isinstance(lab, str) and lab.strip():
-                                    options0.append({"label": lab.strip()})
-                    questions = [{"question": q_text0.strip(), "options": options0}]
-
-            if not isinstance(questions, list) or not questions:
-                result = ToolResult(
-                    tool_use_id=tool_call.tool_use_id,
-                    output=None,
-                    is_error=True,
-                    error_type="InvalidAskUserQuestionInput",
-                    error_message="AskUserQuestion: 'questions' must be a non-empty list",
-                    parent_tool_use_id=self._parent_tool_use_id,
-                    agent_name=self._agent_name,
-                )
-                store.append_event(session_id, result)
-                yield result
-                return
-
-            user_answerer = options.permission_gate.user_answerer
-            if user_answerer is None:
-                result = ToolResult(
-                    tool_use_id=tool_call.tool_use_id,
-                    output=None,
-                    is_error=True,
-                    error_type="NoUserAnswerer",
-                    error_message="AskUserQuestion: no user_answerer is configured",
-                    parent_tool_use_id=self._parent_tool_use_id,
-                    agent_name=self._agent_name,
-                )
-                store.append_event(session_id, result)
-                yield result
-                return
-
-            answers: dict[str, str] = {}
-            for i, q in enumerate(questions):
-                if not isinstance(q, dict):
-                    continue
-                q_text = q.get("question")
-                if not isinstance(q_text, str) or not q_text:
-                    continue
-                opts = q.get("options") or []
-                labels: list[str] = []
-                if isinstance(opts, list):
-                    for opt in opts:
-                        if isinstance(opt, dict):
-                            lab = opt.get("label")
-                            if isinstance(lab, str) and lab:
-                                labels.append(lab)
-                if not labels:
-                    labels = ["ok"]
-
-                uq = UserQuestion(
-                    question_id=f"{tool_call.tool_use_id}:{i}",
-                    prompt=q_text,
-                    choices=labels,
-                    parent_tool_use_id=self._parent_tool_use_id,
-                    agent_name=self._agent_name,
-                )
-                store.append_event(session_id, uq)
-                yield uq
-                ans = await user_answerer(uq)
-                answers[q_text] = str(ans)
-
-            result = ToolResult(
-                tool_use_id=tool_call.tool_use_id,
-                output={"questions": questions, "answers": answers},
-                is_error=False,
-                parent_tool_use_id=self._parent_tool_use_id,
-                agent_name=self._agent_name,
-            )
-            store.append_event(session_id, result)
-            yield result
+            async for ev in self._handle_ask_user_question(
+                session_id=session_id,
+                tool_call=tool_call,
+                tool_input=tool_input2,
+                store=store,
+            ):
+                yield ev
             return
 
         if tool_name == "Task":
-            agent = tool_input2.get("agent")
-            task_prompt = tool_input2.get("prompt")
-            if not isinstance(agent, str) or not agent:
-                result = ToolResult(
-                    tool_use_id=tool_call.tool_use_id,
-                    output=None,
-                    is_error=True,
-                    error_type="InvalidTaskInput",
-                    error_message="Task: 'agent' must be a non-empty string",
-                    parent_tool_use_id=self._parent_tool_use_id,
-                    agent_name=self._agent_name,
-                )
-                store.append_event(session_id, result)
-                yield result
-                return
-            if not isinstance(task_prompt, str) or not task_prompt:
-                result = ToolResult(
-                    tool_use_id=tool_call.tool_use_id,
-                    output=None,
-                    is_error=True,
-                    error_type="InvalidTaskInput",
-                    error_message="Task: 'prompt' must be a non-empty string",
-                    parent_tool_use_id=self._parent_tool_use_id,
-                    agent_name=self._agent_name,
-                )
-                store.append_event(session_id, result)
-                yield result
-                return
-
-            definition = options.agents.get(agent)
-            if definition is None:
-                result = ToolResult(
-                    tool_use_id=tool_call.tool_use_id,
-                    output=None,
-                    is_error=True,
-                    error_type="UnknownAgent",
-                    error_message=f"Unknown agent '{agent}'",
-                    parent_tool_use_id=self._parent_tool_use_id,
-                    agent_name=self._agent_name,
-                )
-                store.append_event(session_id, result)
-                yield result
-                return
-
-            child_session_id = store.create_session(
-                metadata={
-                    "parent_session_id": session_id,
-                    "parent_tool_use_id": tool_call.tool_use_id,
-                    "agent_name": agent,
-                }
-            )
-            child_options = OpenAgenticOptions(
-                provider=definition.provider or options.provider,
-                model=definition.model or options.model,
-                api_key=options.api_key,
-                cwd=options.cwd,
-                max_steps=options.max_steps,
-                timeout_s=options.timeout_s,
-                tools=options.tools,
-                allowed_tools=list(definition.tools) if definition.tools else options.allowed_tools,
-                permission_gate=options.permission_gate,
-                hooks=options.hooks,
-                session_store=store,
-                resume=child_session_id,
-                setting_sources=options.setting_sources,
-                agents=options.agents,
-            )
-
-            child_runtime = AgentRuntime(child_options, agent_name=agent, parent_tool_use_id=tool_call.tool_use_id)
-            combined_prompt = definition.prompt + "\n\n" + task_prompt
-            child_final_text = ""
-            async for child_event in child_runtime.query(combined_prompt):
-                store.append_event(session_id, child_event)
-                yield child_event
-                if isinstance(child_event, Result):
-                    child_final_text = child_event.final_text
-
-            result = ToolResult(
-                tool_use_id=tool_call.tool_use_id,
-                output={"child_session_id": child_session_id, "final_text": child_final_text},
-                is_error=False,
-                parent_tool_use_id=self._parent_tool_use_id,
-                agent_name=self._agent_name,
-            )
-            store.append_event(session_id, result)
-            yield result
+            async for ev in self._handle_task_tool(
+                session_id=session_id,
+                tool_call=tool_call,
+                tool_input=tool_input2,
+                store=store,
+            ):
+                yield ev
             return
 
         if tool_name == "WebFetch":
             prompt_text = tool_input2.get("prompt")
             if isinstance(prompt_text, str) and prompt_text:
-                try:
-                    tool = options.tools.get(tool_name)
-                    fetched = await tool.run(tool_input2, ToolContext(cwd=options.cwd, project_dir=options.project_dir))
-                    page_text = fetched.get("text", "") if isinstance(fetched, dict) else ""
-                    if not isinstance(page_text, str):
-                        page_text = str(page_text)
-                    model_out = await options.provider.complete(
-                        model=options.model,
-                        messages=[
-                            {
-                                "role": "user",
-                                "content": f"{prompt_text}\n\nCONTENT:\n{page_text}",
-                            }
-                        ],
-                        tools=(),
-                        api_key=options.api_key,
-                    )
-                    response = model_out.assistant_text or ""
-                    output: dict[str, Any] = {
-                        "response": response,
-                        "url": fetched.get("url") if isinstance(fetched, dict) else tool_input2.get("url"),
-                        "final_url": fetched.get("url") if isinstance(fetched, dict) else None,
-                        "status_code": fetched.get("status") if isinstance(fetched, dict) else None,
-                    }
-                    output2, post_events, post_decision = await hooks.run_post_tool_use(
-                        tool_name=tool_name,
-                        tool_output=output,
-                        context=ctx,
-                    )
-                    for he in post_events:
-                        store.append_event(session_id, he)
-                        yield he
-                    if post_decision is not None and post_decision.block:
-                        raise RuntimeError(post_decision.block_reason or "blocked by hook")
-                    result = ToolResult(
-                        tool_use_id=tool_call.tool_use_id,
-                        output=output2,
-                        is_error=False,
-                        parent_tool_use_id=self._parent_tool_use_id,
-                        agent_name=self._agent_name,
-                    )
-                except Exception as e:  # noqa: BLE001
-                    result = ToolResult(
-                        tool_use_id=tool_call.tool_use_id,
-                        output=None,
-                        is_error=True,
-                        error_type=type(e).__name__,
-                        error_message=str(e),
-                        parent_tool_use_id=self._parent_tool_use_id,
-                        agent_name=self._agent_name,
-                    )
-                store.append_event(session_id, result)
-                yield result
+                async for ev in self._handle_webfetch_prompt(
+                    session_id=session_id,
+                    tool_call=tool_call,
+                    tool_input=tool_input2,
+                    store=store,
+                    hooks=hooks,
+                    ctx=ctx,
+                ):
+                    yield ev
                 return
 
         if tool_name == "TodoWrite":
-            try:
-                tool = options.tools.get(tool_name)
-                output = await tool.run(tool_input2, ToolContext(cwd=options.cwd, project_dir=options.project_dir))
-                todos = tool_input2.get("todos")
-                if isinstance(todos, list):
-                    p = store.session_dir(session_id) / "todos.json"
-                    p.write_text(json.dumps({"todos": todos}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-
-                output2, post_events, post_decision = await hooks.run_post_tool_use(
-                    tool_name=tool_name,
-                    tool_output=output,
-                    context=ctx,
-                )
-                for he in post_events:
-                    store.append_event(session_id, he)
-                    yield he
-                if post_decision is not None and post_decision.block:
-                    raise RuntimeError(post_decision.block_reason or "blocked by hook")
-                result = ToolResult(
-                    tool_use_id=tool_call.tool_use_id,
-                    output=output2,
-                    is_error=False,
-                    parent_tool_use_id=self._parent_tool_use_id,
-                    agent_name=self._agent_name,
-                )
-            except Exception as e:  # noqa: BLE001
-                result = ToolResult(
-                    tool_use_id=tool_call.tool_use_id,
-                    output=None,
-                    is_error=True,
-                    error_type=type(e).__name__,
-                    error_message=str(e),
-                    parent_tool_use_id=self._parent_tool_use_id,
-                    agent_name=self._agent_name,
-                )
-            store.append_event(session_id, result)
-            yield result
+            async for ev in self._handle_todowrite(
+                session_id=session_id,
+                tool_call=tool_call,
+                tool_input=tool_input2,
+                store=store,
+                hooks=hooks,
+                ctx=ctx,
+            ):
+                yield ev
             return
 
         try:

@@ -4,11 +4,11 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from openagentic_sdk.options import OpenAgenticOptions
+from openagentic_sdk.permissions.gate import PermissionGate
 from openagentic_sdk.providers.base import ModelOutput, ToolCall
 from openagentic_sdk.sessions.store import FileSessionStore
 from openagentic_sdk.tools.read import ReadTool
 from openagentic_sdk.tools.registry import ToolRegistry
-from openagentic_sdk.permissions.gate import PermissionGate
 
 
 class FakeProvider:

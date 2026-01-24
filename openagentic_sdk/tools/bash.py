@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import shutil
 import subprocess
 import uuid
 from dataclasses import dataclass
@@ -16,6 +18,17 @@ class BashTool(Tool):
     timeout_s: float = 60.0
     max_output_bytes: int = 1024 * 1024
     max_output_lines: int = 2000
+
+    def _shell_argv(self, command: str) -> list[str]:
+        # Prefer bash for consistent quoting/semantics, but fall back so the SDK
+        # still works on minimal environments.
+        if shutil.which("bash"):
+            return ["bash", "-lc", command]
+        if os.name != "nt" and shutil.which("sh"):
+            return ["sh", "-lc", command]
+        if os.name == "nt":
+            return ["cmd", "/c", command]
+        raise RuntimeError("Bash: no compatible shell found (need bash/sh)")
 
     async def run(self, tool_input: Mapping[str, Any], ctx: ToolContext) -> dict[str, Any]:
         command = tool_input.get("command")
@@ -35,7 +48,7 @@ class BashTool(Tool):
         else:
             timeout_s = float(tool_input.get("timeout_s", self.timeout_s))
         proc = subprocess.run(
-            ["bash", "-lc", command],
+            self._shell_argv(command),
             cwd=str(run_cwd),
             capture_output=True,
             text=False,

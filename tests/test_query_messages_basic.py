@@ -1,10 +1,10 @@
 import unittest
 
+from openagentic_sdk.message_query import query_messages
 from openagentic_sdk.options import OpenAgenticOptions
 from openagentic_sdk.permissions.gate import PermissionGate
 from openagentic_sdk.providers.base import ModelOutput
 from openagentic_sdk.sessions.store import FileSessionStore
-from openagentic_sdk.message_query import query_messages
 
 
 class FakeProvider:
@@ -17,8 +17,9 @@ class FakeProvider:
 
 class TestQueryMessages(unittest.IsolatedAsyncioTestCase):
     async def test_query_messages_yields_result_message(self) -> None:
-        from tempfile import TemporaryDirectory
         from pathlib import Path
+        from tempfile import TemporaryDirectory
+
         from openagentic_sdk.messages import ResultMessage
 
         with TemporaryDirectory() as td:

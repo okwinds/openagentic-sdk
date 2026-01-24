@@ -38,6 +38,19 @@ class TestMoreTools(unittest.TestCase):
             self.assertEqual(out["exit_code"], 0)
             self.assertIn("hello", out["stdout"])
 
+    def test_bash_errors_when_no_shell_available(self) -> None:
+        old_path = os.environ.get("PATH")
+        os.environ["PATH"] = ""
+        try:
+            tool = BashTool(timeout_s=1.0)
+            with self.assertRaises(RuntimeError):
+                tool.run_sync({"command": "echo hello"}, ToolContext(cwd="/"))
+        finally:
+            if old_path is None:
+                os.environ.pop("PATH", None)
+            else:
+                os.environ["PATH"] = old_path
+
     def test_web_fetch_uses_transport(self) -> None:
         def transport(url, headers):
             return 200, {"content-type": "text/plain"}, b"ok"
@@ -60,4 +73,3 @@ class TestMoreTools(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

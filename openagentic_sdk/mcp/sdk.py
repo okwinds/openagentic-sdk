@@ -5,7 +5,6 @@ from typing import Any, Awaitable, Callable, Generic, Literal, Mapping, TypeVar
 
 from ..tools.base import Tool, ToolContext
 
-
 T = TypeVar("T")
 
 

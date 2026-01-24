@@ -1,0 +1,17 @@
+line-length = 120
+target-version = "py311"
+
+exclude = [
+  ".venv",
+  ".git",
+  "build",
+  "dist",
+  "example",
+  ".claude",
+]
+
+src = ["openagentic_sdk", "openagentic_cli", "tests"]
+
+[lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]

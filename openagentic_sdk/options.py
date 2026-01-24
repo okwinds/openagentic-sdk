@@ -9,8 +9,8 @@ from .hooks.engine import HookEngine
 from .permissions.gate import PermissionGate
 from .providers.base import Provider
 from .sessions.store import FileSessionStore
-from .tools.registry import ToolRegistry
 from .tools.defaults import default_tool_registry
+from .tools.registry import ToolRegistry
 
 
 @dataclass(frozen=True, slots=True)

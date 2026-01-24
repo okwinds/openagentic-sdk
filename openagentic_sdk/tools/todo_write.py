@@ -5,7 +5,6 @@ from typing import Any, Mapping
 
 from .base import Tool, ToolContext
 
-
 _STATUSES = ("pending", "in_progress", "completed")
 
 

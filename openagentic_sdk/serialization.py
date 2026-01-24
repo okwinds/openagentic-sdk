@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import inspect
 import json
 from dataclasses import asdict
-import inspect
 from typing import Any, Mapping, Type
 
 from . import events

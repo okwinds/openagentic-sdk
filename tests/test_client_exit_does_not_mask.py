@@ -5,7 +5,6 @@ from tempfile import TemporaryDirectory
 from openagentic_sdk.client import OpenAgentSDKClient
 from openagentic_sdk.options import OpenAgenticOptions
 from openagentic_sdk.permissions.gate import PermissionGate
-from openagentic_sdk.providers.base import ModelOutput
 from openagentic_sdk.sessions.store import FileSessionStore
 
 

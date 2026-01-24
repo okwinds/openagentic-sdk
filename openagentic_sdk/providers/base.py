@@ -21,7 +21,9 @@ class ModelOutput:
     provider_metadata: Optional[Mapping[str, Any]] = None
 
 
-class Provider(Protocol):
+class LegacyProvider(Protocol):
+    """Chat-completions style providers (messages in, no response_id threading)."""
+
     name: str
 
     async def complete(
@@ -32,3 +34,24 @@ class Provider(Protocol):
         tools: Sequence[Mapping[str, Any]] = (),
         api_key: str | None = None,
     ) -> ModelOutput: ...
+
+
+class ResponsesProvider(Protocol):
+    """Responses API style providers (input[] in, previous_response_id threading)."""
+
+    name: str
+
+    async def complete(
+        self,
+        *,
+        model: str,
+        input: Sequence[Mapping[str, Any]],
+        tools: Sequence[Mapping[str, Any]] = (),
+        api_key: str | None = None,
+        previous_response_id: str | None = None,
+        store: bool = True,
+        include: Sequence[str] = (),
+    ) -> ModelOutput: ...
+
+
+Provider = LegacyProvider | ResponsesProvider

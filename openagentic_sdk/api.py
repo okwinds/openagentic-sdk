@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, AsyncIterable, AsyncIterator, Sequence
+from typing import Any, AsyncIterable, AsyncIterator
 
-from .options import OpenAgenticOptions
-from .runtime import AgentRuntime, RunResult
 from .message_query import query_messages as _query_messages
+from .options import OpenAgenticOptions
 from .prompting import coerce_prompt
+from .runtime import AgentRuntime, RunResult
 
 
 async def query(*, prompt: str | AsyncIterable[dict[str, Any]], options: OpenAgenticOptions) -> AsyncIterator[Any]:

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from typing import Sequence
-import sys
 
 from openagentic_sdk.hooks.engine import HookEngine
 from openagentic_sdk.hooks.models import HookDecision, HookMatcher

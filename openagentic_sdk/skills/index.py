@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from .parse import parse_skill_markdown
 from ..paths import default_session_root
+from .parse import parse_skill_markdown
 
 
 @dataclass(frozen=True, slots=True)

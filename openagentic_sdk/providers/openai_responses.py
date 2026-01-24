@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Mapping, Optional, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from .base import ModelOutput, ToolCall
 from .openai_compatible import _default_stream_transport, _default_transport  # noqa: PLC2701
 from .sse import parse_sse_events
 from .stream_events import DoneEvent, TextDeltaEvent, ToolCallEvent
-
 
 Transport = Callable[[str, Mapping[str, str], Mapping[str, Any]], Mapping[str, Any]]
 StreamTransport = Callable[[str, Mapping[str, str], Mapping[str, Any]], Iterable[bytes]]

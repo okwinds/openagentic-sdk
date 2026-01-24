@@ -3,11 +3,11 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from openagentic_sdk.api import run
 from openagentic_sdk.options import OpenAgenticOptions
 from openagentic_sdk.permissions.gate import PermissionGate
 from openagentic_sdk.providers.base import ModelOutput
 from openagentic_sdk.sessions.store import FileSessionStore
-from openagentic_sdk.api import run
 
 
 class CapturingProvider:
