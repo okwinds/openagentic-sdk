@@ -24,8 +24,7 @@ class TestExecuteSkillPromptExpand(unittest.TestCase):
                 setting_sources=["project"],
             )
             out = _maybe_expand_execute_skill_prompt("执行技能main-process", opts)
-            self.assertIn("SKILL.md:", out)
-            self.assertIn("name: main-process", out)
+            self.assertIn('Skill({"name": "main-process"})', out)
 
     def test_does_not_expand_other_prompts(self) -> None:
         from openagentic_sdk.options import OpenAgenticOptions
@@ -55,7 +54,7 @@ class TestExecuteSkillPromptExpand(unittest.TestCase):
             )
             out = _maybe_expand_list_skills_prompt("What Skills are available?", opts)
             self.assertIn("Skill", out)
-            self.assertIn("action='list'", out)
+            self.assertIn("<available_skills>", out)
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ from openagentic_sdk.tools.skill import SkillTool
 
 
 class TestSkillTool(unittest.TestCase):
-    def test_list_and_load(self) -> None:
+    def test_load(self) -> None:
         with TemporaryDirectory() as td:
             root = Path(td)
             p = root / ".claude" / "skills" / "main-process"
@@ -18,16 +18,13 @@ class TestSkillTool(unittest.TestCase):
             )
 
             tool = SkillTool()
-            listed = tool.run_sync({"action": "list"}, ToolContext(cwd="/", project_dir=str(root)))
-            names = [s.get("name") for s in listed.get("skills") or []]
-            self.assertIn("main-process", names)
-
-            loaded = tool.run_sync({"action": "load", "name": "main-process"}, ToolContext(cwd="/", project_dir=str(root)))
+            loaded = tool.run_sync({"name": "main-process"}, ToolContext(cwd="/", project_dir=str(root)))
             self.assertEqual(loaded["name"], "main-process")
             self.assertEqual(loaded["description"], "desc")
             self.assertIn("SKILL.md", loaded["path"])
+            self.assertIn("Base directory", loaded["output"])
 
-    def test_list_with_empty_name_does_not_error(self) -> None:
+    def test_missing_name_errors(self) -> None:
         with TemporaryDirectory() as td:
             root = Path(td)
             p = root / ".claude" / "skills" / "a"
@@ -35,9 +32,8 @@ class TestSkillTool(unittest.TestCase):
             (p / "SKILL.md").write_text("---\nname: a\ndescription: d\n---\n", encoding="utf-8")
 
             tool = SkillTool()
-            listed = tool.run_sync({"action": "list", "name": ""}, ToolContext(cwd="/", project_dir=str(root)))
-            names = [s.get("name") for s in listed.get("skills") or []]
-            self.assertEqual(names, ["a"])
+            with self.assertRaises(ValueError):
+                tool.run_sync({}, ToolContext(cwd="/", project_dir=str(root)))
 
 
 if __name__ == "__main__":

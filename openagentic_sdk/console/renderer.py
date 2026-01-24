@@ -214,13 +214,6 @@ class ConsoleRenderer:
             self.stream.flush()
             return
 
-        if t == "skill.activated":
-            name = getattr(ev, "name", "")
-            if isinstance(name, str) and name:
-                self.stream.write(f"[skill] activated {name}\n")
-                self.stream.flush()
-            return
-
         if t == "result":
             stop_reason = getattr(ev, "stop_reason", None)
             session_id = getattr(ev, "session_id", None)

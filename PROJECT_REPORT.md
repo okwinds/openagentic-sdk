@@ -40,7 +40,7 @@
 - `WebFetch`
 - `WebSearch`
 - `TodoWrite`
-- `.claude` 相关：`SlashCommand`、`Skill`（以及兼容用 `SkillList/SkillLoad/SkillActivate`）
+- `.claude` 相关：`SlashCommand`、`Skill`
 
 ## CLI 使用方式（面向用户）
 - `oa chat`：多轮 REPL（支持 slash commands）

@@ -9,6 +9,4 @@ Only the skills listed here are available:
 </available_skills>
 
 Usage:
-- To list skills: call `Skill` with `action="list"` (or omit `action` and `name`)
-- To load a skill: call `Skill` with `action="load"` and `name="<skill-name>"`
-- If `action` is omitted: list if `name` is missing, otherwise load
+- Load a skill: call `Skill` with `name="<skill-name>"`

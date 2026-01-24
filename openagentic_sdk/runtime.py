@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,7 +10,6 @@ from .events import (
     AssistantDelta,
     AssistantMessage,
     Result,
-    SkillActivated,
     SystemInit,
     ToolResult,
     ToolUse,
@@ -41,22 +39,10 @@ def _build_project_system_prompt(options: OpenAgenticOptions) -> str | None:
         return None
     project_dir = options.project_dir or options.cwd
     settings = load_claude_project_settings(project_dir)
-    skills = index_skills(project_dir=project_dir)
 
     parts: list[str] = []
     if settings.memory:
         parts.append(settings.memory.strip())
-    if skills:
-        lines = [
-            "## Skills",
-            "Use the `Skill` tool to list/load skills at runtime (preferred).",
-            "If the user asks what skills are available, you MUST call `Skill` with action='list' and answer based on its result (do not guess).",
-            "If the user asks to execute/run a skill (e.g. “执行技能 <name>”), you MUST load that skill (via `Skill` action='load' or `SkillLoad`) and follow its Workflow/Checklist. Do not ask for extra input unless the skill explicitly requires it.",
-        ]
-        for s in skills:
-            summary = f": {s.summary}" if s.summary else ""
-            lines.append(f"- {s.name}{summary} ({s.path})")
-        parts.append("\n".join(lines))
     if settings.commands:
         lines = ["## Slash Commands"]
         for c in settings.commands:
@@ -81,8 +67,8 @@ def _maybe_expand_execute_skill_prompt(prompt: str, options: OpenAgenticOptions)
     """
     Best-effort helper for users who type "执行技能<name>" expecting an automatic skill run.
 
-    If the prompt matches and the skill exists on disk, inline the SKILL.md content and instruct
-    the model to follow the Workflow without asking for extra input.
+    If the prompt matches and the skill exists on disk, instruct the model to load it via the
+    `Skill` tool and follow the Workflow/Checklist without asking for extra input.
     """
     m = _EXEC_SKILL_RE.match(prompt or "")
     if not m:
@@ -95,22 +81,11 @@ def _maybe_expand_execute_skill_prompt(prompt: str, options: OpenAgenticOptions)
     if match is None:
         return prompt
 
-    try:
-        raw = Path(match.path).read_text(encoding="utf-8", errors="replace")
-    except Exception:  # noqa: BLE001
-        return prompt
-
-    if len(raw) > 50_000:
-        raw = raw[:50_000] + "\n\n[truncated]\n"
-
     return (
-        f"你正在执行技能 `{skill_name}`（来自 `.claude/skills`）。\n"
+        f"你正在执行技能 `{skill_name}`。\n"
         "除非技能文档明确要求，否则不要向用户询问额外的目标/输入。\n"
         "请严格按技能的 Workflow/Checklist 执行。\n\n"
-        "SKILL.md:\n"
-        "-----\n"
-        f"{raw}\n"
-        "-----\n"
+        f'你 MUST 调用 `Skill` 工具加载该技能：`Skill({{"name": "{skill_name}"}})`。\n'
     )
 
 
@@ -129,24 +104,9 @@ def _maybe_expand_list_skills_prompt(prompt: str, options: OpenAgenticOptions) -
 
     return (
         "List the available Skills for this project.\n"
-        "You MUST call the `Skill` tool with action='list'.\n"
-        "Then present the results as a short bullet list: `name` — description (or summary).\n"
+        "The available skills are listed in the `Skill` tool description under <available_skills>.\n"
+        "Present them as a short bullet list: `name` — description (or summary).\n"
     )
-
-
-def _render_system_prompt(base: str, active_skills: list[str]) -> str:
-    if not active_skills:
-        return base
-    lines = [base, "## Active Skills", *[f"- {n}" for n in active_skills]]
-    return "\n\n".join([ln for ln in lines if ln]).strip()
-
-
-def _rebuild_active_skills(events: Sequence[Any]) -> list[str]:
-    active: list[str] = []
-    for e in events:
-        if isinstance(e, SkillActivated) and e.name and e.name not in active:
-            active.append(e.name)
-    return active
 
 
 @dataclass(frozen=True, slots=True)
@@ -189,7 +149,6 @@ class AgentRuntime:
                     max_bytes=options.resume_max_bytes,
                 )
             )
-            self._active_skills = _rebuild_active_skills(past_events)
         else:
             metadata: dict[str, Any] = {
                 "cwd": options.cwd,
@@ -202,7 +161,6 @@ class AgentRuntime:
                 metadata["allowed_tools"] = list(options.allowed_tools)
             session_id = store.create_session(metadata=metadata)
             messages = []
-            self._active_skills = []
 
         init = SystemInit(
             session_id=session_id,
@@ -222,7 +180,7 @@ class AgentRuntime:
 
         sys_prompt = _build_project_system_prompt(options)
         if sys_prompt:
-            messages.insert(0, {"role": "system", "content": _render_system_prompt(sys_prompt, self._active_skills)})
+            messages.insert(0, {"role": "system", "content": sys_prompt})
         self._base_system_prompt = sys_prompt
 
         prompt2, hook_events0, decision0 = await options.hooks.run_user_prompt_submit(
@@ -299,7 +257,7 @@ class AgentRuntime:
             if getattr(self, "_base_system_prompt", None) and messages and messages[0].get("role") == "system":
                 messages[0] = {
                     "role": "system",
-                    "content": _render_system_prompt(self._base_system_prompt, self._active_skills),  # type: ignore[arg-type]
+                    "content": self._base_system_prompt,  # type: ignore[arg-type]
                 }
 
             model_ctx = {
@@ -644,44 +602,6 @@ class AgentRuntime:
             result = ToolResult(
                 tool_use_id=tool_call.tool_use_id,
                 output={"questions": questions, "answers": answers},
-                is_error=False,
-                parent_tool_use_id=self._parent_tool_use_id,
-                agent_name=self._agent_name,
-            )
-            store.append_event(session_id, result)
-            yield result
-            return
-
-        if tool_name == "SkillActivate":
-            skill_name = tool_input2.get("name")
-            if not isinstance(skill_name, str) or not skill_name:
-                result = ToolResult(
-                    tool_use_id=tool_call.tool_use_id,
-                    output=None,
-                    is_error=True,
-                    error_type="InvalidSkillActivateInput",
-                    error_message="SkillActivate: 'name' must be a non-empty string",
-                    parent_tool_use_id=self._parent_tool_use_id,
-                    agent_name=self._agent_name,
-                )
-                store.append_event(session_id, result)
-                yield result
-                return
-
-            if skill_name not in self._active_skills:
-                self._active_skills.append(skill_name)
-
-            activated = SkillActivated(
-                name=skill_name,
-                parent_tool_use_id=self._parent_tool_use_id,
-                agent_name=self._agent_name,
-            )
-            store.append_event(session_id, activated)
-            yield activated
-
-            result = ToolResult(
-                tool_use_id=tool_call.tool_use_id,
-                output={"active": list(self._active_skills)},
                 is_error=False,
                 parent_tool_use_id=self._parent_tool_use_id,
                 agent_name=self._agent_name,

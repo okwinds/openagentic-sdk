@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 
 
 class TestToolContextProjectDir(unittest.TestCase):
-    def test_skill_list_defaults_to_ctx_project_dir(self) -> None:
+    def test_skill_defaults_to_ctx_project_dir(self) -> None:
         from openagentic_sdk.tools.base import ToolContext
         from openagentic_sdk.tools.defaults import default_tool_registry
 
@@ -15,9 +15,8 @@ class TestToolContextProjectDir(unittest.TestCase):
             (skills_root / "SKILL.md").write_text("# a\n\nsummary\n", encoding="utf-8")
 
             tools = default_tool_registry()
-            out = tools.get("SkillList").run_sync({}, ToolContext(cwd="/", project_dir=str(root)))
-            names = [s.get("name") for s in out.get("skills") or []]
-            self.assertIn("a", names)
+            out = tools.get("Skill").run_sync({"name": "a"}, ToolContext(cwd="/", project_dir=str(root)))
+            self.assertEqual(out["name"], "a")
 
     def test_slash_command_defaults_to_ctx_project_dir(self) -> None:
         from openagentic_sdk.tools.base import ToolContext
@@ -36,4 +35,3 @@ class TestToolContextProjectDir(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

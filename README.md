@@ -185,8 +185,7 @@ Default registry includes:
 - `WebSearch` (Tavily; requires `TAVILY_API_KEY`)
 - `TodoWrite`
 - `SlashCommand` (loads `.claude/commands/<name>.md`)
-- `Skill` (CAS-style single tool for `.claude/skills/**/SKILL.md`)
-- `SkillList`, `SkillLoad`, `SkillActivate` (legacy/compat)
+- `Skill` (load a Skill by `name`; available skills are listed in the tool description)
 
 For OpenAI-compatible providers, tool schemas include long-form “how to use this tool” descriptions (opencode-style)
 to make the model follow rules more reliably.
@@ -196,10 +195,14 @@ to make the model follow rules more reliably.
 When `setting_sources=["project"]`, the SDK can index:
 
 - `CLAUDE.md` or `.claude/CLAUDE.md` (memory)
-- `.claude/skills/**/SKILL.md`
 - `.claude/commands/*.md`
 
-When `setting_sources=["project"]`, `query()` prepends a `system` message with project memory + skills/commands index; `SkillActivate` adds an "Active Skills" section persisted via `skill.activated` events (survives `resume`).
+Skills are discovered from:
+
+- Project (compat): `.claude/{skill,skills}/**/SKILL.md`
+- Global: `~/.openagentic-sdk/{skill,skills}/**/SKILL.md` (override with `OPENAGENTIC_SDK_HOME`)
+
+When `setting_sources=["project"]`, `query()` prepends a `system` message with project memory + commands index (skills are exposed via the `Skill` tool description).
 
 ## Console output (human-first)
 

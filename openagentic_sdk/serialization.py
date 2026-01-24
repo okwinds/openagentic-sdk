@@ -17,7 +17,6 @@ _TYPE_MAP: Mapping[str, Type[events.EventBase]] = {
     "tool.use": events.ToolUse,
     "tool.result": events.ToolResult,
     "hook.event": events.HookEvent,
-    "skill.activated": events.SkillActivated,
     "result": events.Result,
 }
 

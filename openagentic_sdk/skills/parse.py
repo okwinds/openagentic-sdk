@@ -37,6 +37,17 @@ def _parse_frontmatter(lines: list[str]) -> tuple[dict[str, str], int]:
     return meta, 0
 
 
+def strip_frontmatter(text: str) -> str:
+    """
+    Remove top-of-file '---' frontmatter block if present.
+    """
+    lines = text.splitlines()
+    _, start = _parse_frontmatter(lines)
+    if start <= 0:
+        return text
+    return "\n".join(lines[start:]) + ("\n" if text.endswith("\n") else "")
+
+
 def parse_skill_markdown(text: str) -> SkillDoc:
     lines = text.splitlines()
     meta, _ = _parse_frontmatter(lines)

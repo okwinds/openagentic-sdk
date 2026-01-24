@@ -18,8 +18,6 @@ _SAFE_TOOLS: set[str] = {
     "Glob",
     "Grep",
     "Skill",
-    "SkillList",
-    "SkillLoad",
     "SlashCommand",
     "TodoWrite",
 }

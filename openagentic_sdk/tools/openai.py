@@ -18,6 +18,8 @@ def tool_schemas_for_openai(
     cwd = ctx.get("cwd")
     directory = cwd if isinstance(cwd, str) and cwd else "(unknown)"
     project_dir = ctx.get("project_dir") if isinstance(ctx.get("project_dir"), str) else None
+    if not project_dir and isinstance(directory, str) and directory and directory != "(unknown)":
+        project_dir = directory
 
     bash_max_bytes = 1024 * 1024
     bash_max_lines = 2000
@@ -225,47 +227,12 @@ def tool_schemas_for_openai(
             "type": "function",
             "function": {
                 "name": "Skill",
-                "description": "List or load Skills from .claude/skills/**/SKILL.md.",
+                "description": "Load a Skill by name.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "action": {"type": "string", "enum": ["list", "load"]},
                         "name": {"type": "string"},
                     },
-                },
-            },
-        },
-        "SkillList": {
-            "type": "function",
-            "function": {
-                "name": "SkillList",
-                "description": "List skills from .claude/skills/**/SKILL.md.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {"project_dir": {"type": "string"}},
-                },
-            },
-        },
-        "SkillLoad": {
-            "type": "function",
-            "function": {
-                "name": "SkillLoad",
-                "description": "Load a skill's SKILL.md by name.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {"name": {"type": "string"}, "project_dir": {"type": "string"}},
-                    "required": ["name"],
-                },
-            },
-        },
-        "SkillActivate": {
-            "type": "function",
-            "function": {
-                "name": "SkillActivate",
-                "description": "Activate a skill for the current session.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {"name": {"type": "string"}},
                     "required": ["name"],
                 },
             },
@@ -336,9 +303,6 @@ def tool_schemas_for_openai(
         )
         schemas["Skill"]["function"]["parameters"]["properties"]["name"]["description"] = (
             "The skill identifier from <available_skills>." + hint
-        )
-        schemas["Skill"]["function"]["parameters"]["properties"]["action"]["description"] = (
-            "Either 'list' or 'load'. If omitted: list when name is missing, otherwise load."
         )
     # Tool prompt injection (opencode-style templates).
     schemas["AskUserQuestion"]["function"]["description"] = render_tool_prompt("question", variables=prompt_vars)

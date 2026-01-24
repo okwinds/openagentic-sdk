@@ -54,7 +54,7 @@ class PermissionGate:
             mode = "prompt"
 
         if mode == "default":
-            safe = {"Read", "Glob", "Grep", "SkillList", "SkillLoad", "SlashCommand", "AskUserQuestion"}
+            safe = {"Read", "Glob", "Grep", "Skill", "SlashCommand", "AskUserQuestion"}
             if tool_name in safe:
                 return ApprovalResult(True)
             mode = "prompt"

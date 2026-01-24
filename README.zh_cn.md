@@ -112,8 +112,7 @@ uv run oa chat
 - `WebSearch`（需要 `TAVILY_API_KEY`）
 - `TodoWrite`
 - `SlashCommand`（加载 `.claude/commands/<name>.md`）
-- `Skill`（CAS 风格单工具：列出/加载 `.claude/skills/**/SKILL.md`）
-- `SkillList`, `SkillLoad`, `SkillActivate`（兼容用）
+- `Skill`（按 `name` 加载技能；可用技能列表在 tool description 里）
 
 对 OpenAI-compatible provider，会把一套长文本 “tool 使用说明” 注入到 tool schema 的 `description` 里（opencode 风格），用来提升模型按规则调用工具的稳定性。
 
@@ -122,10 +121,14 @@ uv run oa chat
 当 `setting_sources=["project"]` 时，会索引：
 
 - `CLAUDE.md` 或 `.claude/CLAUDE.md`
-- `.claude/skills/**/SKILL.md`
 - `.claude/commands/*.md`
 
-`SkillActivate` 会在 system prompt 里维护 “Active Skills”，并通过事件持久化（`resume` 后仍可恢复）。
+Skills 发现路径：
+
+- 项目级（兼容）：`.claude/{skill,skills}/**/SKILL.md`
+- 全局：`~/.openagentic-sdk/{skill,skills}/**/SKILL.md`（可用 `OPENAGENTIC_SDK_HOME` 覆盖）
+
+当 `setting_sources=["project"]` 时，`query()` 会在 system prompt 中注入项目 memory + commands 索引（skills 通过 `Skill` tool description 暴露）。
 
 ## Console 输出（默认清爽，调试可开）
 

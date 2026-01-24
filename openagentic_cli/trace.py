@@ -6,7 +6,7 @@ from typing import Any, Mapping, TextIO
 
 
 def _tool_group(name: str) -> str:
-    if name in ("Read", "Glob", "Grep", "WebFetch", "WebSearch", "SlashCommand", "Skill", "SkillList", "SkillLoad"):
+    if name in ("Read", "Glob", "Grep", "WebFetch", "WebSearch", "SlashCommand", "Skill"):
         return "Explored"
     if name in ("Write", "Edit", "NotebookEdit", "TodoWrite"):
         return "Edited"
@@ -42,12 +42,7 @@ def _summarize_tool_use(name: str, tool_input: Mapping[str, Any] | None) -> str:
         n = inp.get("name")
         return f"/{n}" if isinstance(n, str) and n else "SlashCommand"
     if name == "Skill":
-        action = inp.get("action")
         n = inp.get("name")
-        if isinstance(action, str) and action:
-            if isinstance(n, str) and n:
-                return f"Skill {action} `{n}`"
-            return f"Skill {action}"
         if isinstance(n, str) and n:
             return f"Skill `{n}`"
         return "Skill"

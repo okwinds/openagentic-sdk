@@ -102,14 +102,6 @@ class HookEvent(EventBase):
     action: str | None = None
 
 
-@dataclass(frozen=True, slots=True)
-class SkillActivated(EventBase):
-    type: Literal["skill.activated"] = "skill.activated"
-    name: str = ""
-    parent_tool_use_id: str | None = None
-    agent_name: str | None = None
-
-
 Event = (
     SystemInit
     | UserMessage
@@ -119,6 +111,5 @@ Event = (
     | ToolUse
     | ToolResult
     | HookEvent
-    | SkillActivated
     | Result
 )

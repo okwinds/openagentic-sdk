@@ -9,9 +9,6 @@ from .read import ReadTool
 from .registry import ToolRegistry
 from .slash_command import SlashCommandTool
 from .skill import SkillTool
-from .skill_activate import SkillActivateTool
-from .skill_list import SkillListTool
-from .skill_load import SkillLoadTool
 from .notebook_edit import NotebookEditTool
 from .web_fetch import WebFetchTool
 from .web_search_tavily import WebSearchTool
@@ -34,9 +31,6 @@ def default_tool_registry() -> ToolRegistry:
             NotebookEditTool(),
             SlashCommandTool(),
             SkillTool(),
-            SkillListTool(),
-            SkillLoadTool(),
-            SkillActivateTool(),
             TodoWriteTool(),
         ]
     )

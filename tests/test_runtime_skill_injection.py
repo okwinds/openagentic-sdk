@@ -53,10 +53,8 @@ class TestRuntimeSkillInjection(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(first_call_msgs[0]["role"], "system")
             sys = first_call_msgs[0]["content"]
             self.assertIn("project memory", sys)
-            self.assertIn("example", sys)
             self.assertIn("/hello", sys)
 
 
 if __name__ == "__main__":
     unittest.main()
-
