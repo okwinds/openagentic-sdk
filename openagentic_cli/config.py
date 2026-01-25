@@ -16,6 +16,7 @@ from openagentic_sdk.mcp.auth_store import McpAuthStore
 from openagentic_sdk.permissions.gate import PermissionGate
 from openagentic_sdk.permissions.interactive import InteractiveApprover
 from openagentic_sdk.providers.openai_responses import OpenAIResponsesProvider
+from openagentic_sdk.providers.selection import parse_model_ref, resolve_provider_and_model
 from openagentic_sdk.tools.defaults import default_tool_registry
 from openagentic_sdk.custom_tools import load_custom_tools
 from openagentic_sdk.js_tools import load_js_tools
@@ -221,10 +222,26 @@ def build_options(
     provider_obj = build_provider_rightcode()
     api_key_val = os.getenv("RIGHTCODE_API_KEY")
 
+    # OpenCode parity: model can be `provider/model`. If present, it is the
+    # primary selection mechanism and should override OA_PROVIDER heuristics.
+    raw_model = cfg.get("model") if isinstance(cfg, dict) and isinstance(cfg.get("model"), str) else None
+    if not raw_model:
+        raw_model = os.getenv("RIGHTCODE_MODEL", "gpt-5.2")
+    model_ref = parse_model_ref(raw_model)
+
     # Provider config (OpenCode parity, minimal): allow selecting a configured provider
     # via OA_PROVIDER when `provider.<name>.options.baseURL/apiKey` exists.
     prov_cfg = cfg.get("provider") if isinstance(cfg, dict) else None
-    if isinstance(prov_cfg, dict) and prov_cfg:
+    if model_ref.provider_id:
+        resolved = resolve_provider_and_model(
+            cfg=cfg if isinstance(cfg, dict) else None,
+            model_ref=model_ref,
+            base_provider=provider_obj,
+            base_api_key=api_key_val,
+        )
+        provider_obj = resolved.provider
+        api_key_val = resolved.api_key
+    elif isinstance(prov_cfg, dict) and prov_cfg:
         selected = os.getenv("OA_PROVIDER")
         spec = prov_cfg.get(selected) if isinstance(selected, str) and selected in prov_cfg else None
         if spec is None and len(prov_cfg) == 1:
@@ -251,13 +268,46 @@ def build_options(
                 if isinstance(api_key, str) and api_key:
                     api_key_val = api_key
 
+    # OpenCode parity: derive compaction token limits from model metadata when
+    # the user did not specify explicit limits.
+    if model_ref.provider_id and (int(compaction.context_limit or 0) <= 0 or compaction.output_limit is None):
+        try:
+            from openagentic_sdk.providers.models_dev import get_models_dev
+
+            db = get_models_dev()
+            p = db.get(str(model_ref.provider_id)) if isinstance(db, dict) else None
+            models = p.get("models") if isinstance(p, dict) else None
+            m = models.get(str(model_ref.model_id)) if isinstance(models, dict) else None
+            lim = m.get("limit") if isinstance(m, dict) else None
+            if isinstance(lim, dict):
+                ctx_limit = int(lim.get("context") or 0)
+                out_limit = int(lim.get("output") or 0)
+                new_context_limit = compaction.context_limit
+                new_output_limit = compaction.output_limit
+                if int(new_context_limit or 0) <= 0 and ctx_limit > 0:
+                    new_context_limit = ctx_limit
+                if new_output_limit is None and out_limit > 0:
+                    new_output_limit = out_limit
+                if new_context_limit != compaction.context_limit or new_output_limit != compaction.output_limit:
+                    compaction = CompactionOptions(
+                        auto=compaction.auto,
+                        prune=compaction.prune,
+                        context_limit=int(new_context_limit or 0),
+                        output_limit=new_output_limit,
+                        global_output_cap=compaction.global_output_cap,
+                        protect_tool_output_tokens=compaction.protect_tool_output_tokens,
+                        min_prune_tokens=compaction.min_prune_tokens,
+                    )
+        except Exception:
+            pass
+
     if not api_key_val:
         api_key_val = require_env("RIGHTCODE_API_KEY")
 
     return OpenAgenticOptions(
         provider=provider_obj,
         api_key=api_key_val,
-        model=str(cfg.get("model")) if isinstance(cfg, dict) and isinstance(cfg.get("model"), str) else os.getenv("RIGHTCODE_MODEL", "gpt-5.2"),
+        model=(model_ref.model_id if model_ref.provider_id else str(raw_model or "gpt-5.2")),
         cwd=cwd,
         project_dir=project_dir,
         tools=tools,

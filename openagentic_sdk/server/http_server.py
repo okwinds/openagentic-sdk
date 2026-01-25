@@ -17,11 +17,14 @@ from typing import Any, Mapping
 from urllib.parse import parse_qs, urlparse
 
 from ..options import OpenAgenticOptions
+from ..opencode_config import load_merged_config
 from ..serialization import event_to_dict
 from ..sessions.rebuild import rebuild_messages
 from ..sessions.store import FileSessionStore
 from .opencode_view import build_message_v2
 from ..share.share import fetch_shared_session, share_session, unshare_session
+from ..auth import ApiAuth, OAuthAuth, all_auth
+from ..providers.catalog import build_provider_listing
 
 
 _DEFAULT_MAX_REQUEST_BYTES = 2_000_000
@@ -297,6 +300,10 @@ class OpenAgenticHttpServer:
                                 "/global/health": {"get": {}},
                                 "/global/event": {"get": {}},
                                 "/event": {"get": {}},
+                                "/provider": {"get": {}},
+                                "/provider/auth": {"get": {}},
+                                "/provider/{providerID}/oauth/authorize": {"post": {}},
+                                "/provider/{providerID}/oauth/callback": {"post": {}},
                                 "/session": {"get": {}, "post": {}},
                                 "/session/status": {"get": {}},
                                 "/session/{id}": {"get": {}, "patch": {}, "delete": {}},
@@ -316,6 +323,39 @@ class OpenAgenticHttpServer:
                             },
                         },
                     )
+                    return
+
+                if parts == ["provider"]:
+                    # OpenCode parity: provider list surface (models.dev + config + auth).
+                    try:
+                        cfg = load_merged_config(cwd=str(Path(opts.project_dir or opts.cwd)))
+                    except Exception:
+                        cfg = {}
+                    _write_json(self, 200, build_provider_listing(cfg if isinstance(cfg, dict) else None))
+                    return
+
+                if parts == ["provider", "auth"]:
+                    # OpenCode parity: provider auth methods. OpenCode gathers
+                    # these from plugins; we provide best-effort built-ins.
+                    try:
+                        cfg = load_merged_config(cwd=str(Path(opts.project_dir or opts.cwd)))
+                    except Exception:
+                        cfg = {}
+                    auth = all_auth()
+
+                    listing = build_provider_listing(cfg if isinstance(cfg, dict) else None)
+                    auth_methods: dict[str, list[dict[str, str]]] = {}
+                    for p in listing.get("all") if isinstance(listing.get("all"), list) else []:
+                        pid = p.get("id") if isinstance(p, dict) else None
+                        if not isinstance(pid, str) or not pid:
+                            continue
+                        methods: list[dict[str, str]] = [{"type": "api", "label": "API Key"}]
+                        a = auth.get(pid)
+                        if isinstance(a, OAuthAuth):
+                            methods.append({"type": "oauth", "label": "OAuth"})
+                        auth_methods[pid] = methods
+
+                    _write_json(self, 200, auth_methods)
                     return
 
                 if parts == ["event"]:
@@ -533,10 +573,10 @@ class OpenAgenticHttpServer:
                         limit = int(limit_raw) if isinstance(limit_raw, str) and limit_raw else None
                     except Exception:
                         limit = None
-                    out = sessions
+                    sessions_out = sessions
                     if isinstance(limit, int) and limit > 0:
-                        out = out[:limit]
-                    _write_json(self, 200, out)
+                        sessions_out = sessions_out[:limit]
+                    _write_json(self, 200, sessions_out)
                     return
 
                 if parts == ["session", "status"]:
@@ -602,6 +642,12 @@ class OpenAgenticHttpServer:
                     return
 
                 parts, _query = _parse_request_target(self.path)
+
+                # OpenCode parity: provider OAuth endpoints (stub until full
+                # provider OAuth manager is implemented).
+                if len(parts) == 4 and parts[0] == "provider" and parts[2] == "oauth" and parts[3] in ("authorize", "callback"):
+                    _write_json(self, 400, {"error": "unsupported"})
+                    return
 
                 # OpenCode parity: permission and question queues.
                 if len(parts) == 3 and parts[0] == "permission" and parts[2] == "reply":

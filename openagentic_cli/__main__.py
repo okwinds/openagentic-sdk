@@ -9,6 +9,7 @@ from openagentic_sdk.paths import default_session_root
 from openagentic_sdk.sessions.store import FileSessionStore
 from openagentic_sdk.server.http_server import serve_http
 
+from .auth_cmd import cmd_auth_list, cmd_auth_remove, cmd_auth_set
 from .args import build_parser
 from .config import build_options
 from .logs_cmd import summarize_events
@@ -123,6 +124,26 @@ def main(argv: list[str] | None = None) -> int:
             sys.stdout.flush()
             return 0
         parser.error("missing or unknown mcp subcommand")
+        return 2
+
+    if ns.command == "auth":
+        sub = getattr(ns, "auth_command", None)
+        if sub == "list":
+            sys.stdout.write(cmd_auth_list() + "\n")
+            sys.stdout.flush()
+            return 0
+        if sub == "set":
+            pid = str(getattr(ns, "provider_id", "") or "")
+            key = str(getattr(ns, "key", "") or "")
+            sys.stdout.write(cmd_auth_set(provider_id=pid, key=key) + "\n")
+            sys.stdout.flush()
+            return 0
+        if sub == "remove":
+            pid = str(getattr(ns, "provider_id", "") or "")
+            sys.stdout.write(cmd_auth_remove(provider_id=pid) + "\n")
+            sys.stdout.flush()
+            return 0
+        parser.error("missing or unknown auth subcommand")
         return 2
 
     if ns.command == "serve":

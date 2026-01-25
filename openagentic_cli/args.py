@@ -61,6 +61,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_shared = sub.add_parser("shared", help="Print a shared session payload")
     p_shared.add_argument("share_id", help="Share id to fetch")
 
+    p_auth = sub.add_parser("auth", help="Manage provider auth (auth.json)")
+    auth_sub = p_auth.add_subparsers(dest="auth_command")
+
+    p_auth_set = auth_sub.add_parser("set", help="Store an API key for a provider")
+    p_auth_set.add_argument("provider_id", help="Provider id (e.g. openai, github-copilot, etc)")
+    p_auth_set.add_argument("--key", required=True, help="API key")
+
+    p_auth_rm = auth_sub.add_parser("remove", help="Remove stored auth for a provider")
+    p_auth_rm.add_argument("provider_id", help="Provider id")
+
+    _ = auth_sub.add_parser("list", help="List providers with stored auth")
+
     p_serve = sub.add_parser("serve", help="Run the local OpenAgentic HTTP server")
     p_serve.add_argument("--host", default="127.0.0.1", help="Bind host (default: 127.0.0.1)")
     p_serve.add_argument("--port", default=4096, type=int, help="Bind port (default: 4096)")
