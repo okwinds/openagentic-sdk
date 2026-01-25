@@ -21,8 +21,10 @@ from ..opencode_config import load_merged_config
 from ..serialization import event_to_dict
 from ..sessions.rebuild import rebuild_messages
 from ..sessions.store import FileSessionStore
+from ..sessions.todos import normalize_todos_for_api
 from .opencode_view import build_message_v2
 from ..share.share import fetch_shared_session, share_session, unshare_session
+from ..share.local import LocalShareProvider
 from ..auth import ApiAuth, OAuthAuth, all_auth
 from ..providers.catalog import build_provider_listing
 
@@ -308,6 +310,10 @@ class OpenAgenticHttpServer:
                                 "/session/status": {"get": {}},
                                 "/session/{id}": {"get": {}, "patch": {}, "delete": {}},
                                 "/session/{id}/message": {"get": {}, "post": {}},
+                                "/session/{id}/children": {"get": {}},
+                                "/session/{id}/todo": {"get": {}},
+                                "/session/{id}/transcript": {"get": {}},
+                                "/session/{id}/fork": {"post": {}},
                                 "/session/{id}/prompt_async": {"post": {}},
                                 "/session/{id}/abort": {"post": {}},
                                 "/permission": {"get": {}},
@@ -345,7 +351,9 @@ class OpenAgenticHttpServer:
 
                     listing = build_provider_listing(cfg if isinstance(cfg, dict) else None)
                     auth_methods: dict[str, list[dict[str, str]]] = {}
-                    for p in listing.get("all") if isinstance(listing.get("all"), list) else []:
+                    all_list = listing.get("all")
+                    providers: list[Any] = all_list if isinstance(all_list, list) else []
+                    for p in providers:
                         pid = p.get("id") if isinstance(p, dict) else None
                         if not isinstance(pid, str) or not pid:
                             continue
@@ -558,7 +566,8 @@ class OpenAgenticHttpServer:
                 if len(parts) == 2 and parts[0] == "share":
                     share_id = parts[1]
                     try:
-                        ss = fetch_shared_session(share_id=share_id)
+                        provider2 = LocalShareProvider(root_dir=store.root_dir / "shares")
+                        ss = fetch_shared_session(share_id=share_id, provider=provider2)
                     except Exception:
                         _write_json(self, 404, {"error": "not_found"})
                         return
@@ -581,10 +590,12 @@ class OpenAgenticHttpServer:
 
                 if parts == ["session", "status"]:
                     data: dict[str, Any] = {}
+                    with running_lock:
+                        busy = set(running_abort.keys())
                     for s in list_sessions(store):
                         sid = s.get("id")
                         if isinstance(sid, str) and sid:
-                            data[sid] = {"type": "idle"}
+                            data[sid] = {"type": "busy" if sid in busy else "idle"}
                     _write_json(self, 200, data)
                     return
 
@@ -620,6 +631,50 @@ class OpenAgenticHttpServer:
                         evs = store.read_events(sid)
                         msgs = build_message_v2(evs, session_id=sid)
                         _write_json(self, 200, msgs)
+                        return
+
+                    if len(parts) == 3 and parts[2] == "children":
+                        if not store.read_meta_record(sid):
+                            _write_json(self, 404, {"error": "not_found"})
+                            return
+                        kids: list[dict[str, Any]] = []
+                        for info in list_sessions(store):
+                            md = info.get("metadata") if isinstance(info, dict) else None
+                            if isinstance(md, dict) and md.get("parent_session_id") == sid:
+                                kids.append(info)
+                        _write_json(self, 200, kids)
+                        return
+
+                    if len(parts) == 3 and parts[2] == "todo":
+                        p = store.session_dir(sid) / "todos.json"
+                        if not p.exists():
+                            _write_json(self, 200, [])
+                            return
+                        try:
+                            obj = json.loads(p.read_text(encoding="utf-8", errors="replace"))
+                        except Exception:  # noqa: BLE001
+                            _write_json(self, 200, [])
+                            return
+                        todos_raw = obj.get("todos") if isinstance(obj, dict) else None
+                        _write_json(self, 200, normalize_todos_for_api(todos_raw))
+                        return
+
+                    if len(parts) == 3 and parts[2] == "transcript":
+                        p = store.session_dir(sid) / "transcript.jsonl"
+                        if not p.exists():
+                            _write_json(self, 200, {"session_id": sid, "entries": []})
+                            return
+                        entries: list[dict[str, Any]] = []
+                        for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
+                            if not line.strip():
+                                continue
+                            try:
+                                obj = json.loads(line)
+                            except Exception:
+                                continue
+                            if isinstance(obj, dict):
+                                entries.append(obj)
+                        _write_json(self, 200, {"session_id": sid, "entries": entries})
                         return
 
                     if len(parts) == 4 and parts[2] == "message":
@@ -772,6 +827,49 @@ class OpenAgenticHttpServer:
                     _write_json(self, 200, latest or {"info": {"role": "assistant"}, "parts": []})
                     return
 
+                if len(parts) == 3 and parts[0] == "session" and parts[2] == "fork":
+                    sid = parts[1]
+                    try:
+                        _ = store.session_dir(sid)
+                    except ValueError:
+                        _write_json(self, 400, {"error": "invalid_session_id"})
+                        return
+                    if not store.read_meta_record(sid):
+                        _write_json(self, 404, {"error": "not_found"})
+                        return
+
+                    # OpenCode parity: do not fork a busy session.
+                    with running_lock:
+                        if sid in running_abort:
+                            _write_json(self, 409, {"error": "busy"})
+                            return
+                    try:
+                        body = _read_json(self)
+                    except ValueError:
+                        _write_json(self, 413, {"error": "payload_too_large"})
+                        return
+
+                    head_seq: int | None = None
+                    msg_id = body.get("messageID") or body.get("messageId")
+                    if isinstance(msg_id, str) and "_" in msg_id:
+                        try:
+                            msg_seq = int(msg_id.rsplit("_", 1)[1])
+                        except Exception:
+                            msg_seq = 0
+                        if msg_seq > 1:
+                            # OpenCode fork excludes the message at messageID and beyond.
+                            head_seq = msg_seq - 1
+
+                    try:
+                        child = store.fork_session(sid, head_seq=head_seq)
+                    except Exception:
+                        _write_json(self, 400, {"error": "invalid_fork"})
+                        return
+
+                    info = _session_info(store, child)
+                    _write_json(self, 200, info or {"id": child})
+                    return
+
                 if len(parts) == 3 and parts[0] == "session" and parts[2] == "prompt_async":
                     sid = parts[1]
                     try:
@@ -880,7 +978,8 @@ class OpenAgenticHttpServer:
                         _write_json(self, 400, {"error": "invalid_session_id"})
                         return
                     # Create a share payload and store the share id in metadata.
-                    share_id = share_session(store=store, session_id=sid)
+                    provider2 = LocalShareProvider(root_dir=store.root_dir / "shares")
+                    share_id = share_session(store=store, session_id=sid, provider=provider2)
                     store.update_metadata(sid, patch={"share_id": share_id, "shared": True})
                     _write_json(self, 200, _session_info(store, sid) or {"id": sid})
                     return
@@ -949,7 +1048,8 @@ class OpenAgenticHttpServer:
                     md = store.read_metadata(sid)
                     share_id = md.get("share_id")
                     if isinstance(share_id, str) and share_id:
-                        unshare_session(share_id=share_id)
+                        provider2 = LocalShareProvider(root_dir=store.root_dir / "shares")
+                        unshare_session(share_id=share_id, provider=provider2)
                     # Clear metadata.
                     store.update_metadata(sid, patch={"share_id": None, "shared": False})
                     _write_json(self, 200, _session_info(store, sid) or {"id": sid})

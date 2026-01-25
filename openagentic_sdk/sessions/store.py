@@ -11,7 +11,7 @@ from typing import Any, Iterable, Optional
 
 from ..events import Event, SessionCheckpoint, SessionRedo, SessionSetHead, SessionUndo
 from ..serialization import event_to_dict, loads_event
-from .paths import events_path, meta_path, session_dir
+from .paths import events_path, meta_path, session_dir, transcript_path
 
 
 @dataclass(frozen=True, slots=True)
@@ -150,6 +150,22 @@ class FileSessionStore:
         with path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(obj, ensure_ascii=False, separators=(",", ":")))
             f.write("\n")
+
+        # Best-effort transcript for UI and diffing. This intentionally excludes
+        # tool inputs/outputs to reduce accidental leakage.
+        et = obj.get("type")
+        if et in ("user.message", "assistant.message"):
+            role = "user" if et == "user.message" else "assistant"
+            entry = {
+                "seq": seq,
+                "ts": obj.get("ts"),
+                "role": role,
+                "text": obj.get("text") if isinstance(obj.get("text"), str) else "",
+            }
+            tp = transcript_path(self.root_dir, session_id)
+            with tp.open("a", encoding="utf-8") as tf:
+                tf.write(json.dumps(entry, ensure_ascii=False, separators=(",", ":")))
+                tf.write("\n")
 
     def read_events(self, session_id: str) -> list[Event]:
         try:

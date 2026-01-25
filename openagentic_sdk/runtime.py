@@ -1665,8 +1665,12 @@ class AgentRuntime:
             output = await tool.run(tool_input, ToolContext(cwd=options.cwd, project_dir=options.project_dir))
             todos = tool_input.get("todos")
             if isinstance(todos, list):
+                # Persist a canonical OpenCode-like todo list.
+                from .sessions.todos import normalize_todos_for_api
+
+                normalized = normalize_todos_for_api(todos)
                 p = store.session_dir(session_id) / "todos.json"
-                p.write_text(json.dumps({"todos": todos}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                p.write_text(json.dumps({"todos": normalized}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
             output2, post_events, post_decision = await hooks.run_post_tool_use(
                 tool_name=tool_name,

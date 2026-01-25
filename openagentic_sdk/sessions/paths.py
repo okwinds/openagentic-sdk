@@ -14,3 +14,6 @@ def events_path(root_dir: Path, session_id: str) -> Path:
 def meta_path(root_dir: Path, session_id: str) -> Path:
     return session_dir(root_dir, session_id) / "meta.json"
 
+
+def transcript_path(root_dir: Path, session_id: str) -> Path:
+    return session_dir(root_dir, session_id) / "transcript.jsonl"
