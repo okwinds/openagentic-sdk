@@ -100,12 +100,17 @@ class LspTool(Tool):
             raise ValueError("lsp: 'character' must be an integer >= 1")
 
         root = ctx.project_dir or ctx.cwd
+        root_p = Path(root).resolve()
+        try:
+            p.relative_to(root_p)
+        except Exception:
+            raise RuntimeError(f"lsp: filePath must be under project root: {root_p}")
         cfg = load_merged_config(cwd=str(root))
         lsp_cfg = parse_lsp_config(cfg)
         if not lsp_cfg.enabled:
             raise RuntimeError("lsp: disabled by config")
 
-        async with LspManager(config=lsp_cfg, project_root=str(root)) as mgr:
+        async with LspManager(cfg=dict(cfg) if isinstance(cfg, Mapping) else None, project_root=str(root)) as mgr:
             res = await mgr.op(operation=op, file_path=str(p), line0=line - 1, character0=character - 1)
 
         # Normalize output to OpenCode-like shape for agent consumption.

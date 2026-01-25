@@ -41,6 +41,8 @@ def _send(obj: dict) -> None:
 
 def main() -> int:
     opened: dict[str, str] = {}
+    last_method_by_uri: dict[str, str] = {}
+    watched_count = 0
     while True:
         try:
             msg = _read_message()
@@ -87,6 +89,7 @@ def main() -> int:
                     text = td.get("text")
                     if isinstance(uri, str) and isinstance(text, str):
                         opened[uri] = text
+                        last_method_by_uri[uri] = "didOpen"
                         # Publish a single fake diagnostic.
                         _send(
                             {
@@ -110,6 +113,49 @@ def main() -> int:
                         )
             continue
 
+        if method == "workspace/didChangeWatchedFiles":
+            # Notification; OpenCode sends this before didOpen/didChange.
+            watched_count += 1
+            continue
+
+        if method == "textDocument/didChange":
+            params = msg.get("params")
+            uri = ""
+            text = None
+            if isinstance(params, dict):
+                td = params.get("textDocument")
+                if isinstance(td, dict) and isinstance(td.get("uri"), str):
+                    uri = td.get("uri") or ""
+                cc = params.get("contentChanges")
+                if isinstance(cc, list) and cc and isinstance(cc[0], dict):
+                    t = cc[0].get("text")
+                    if isinstance(t, str):
+                        text = t
+            if uri and isinstance(text, str):
+                opened[uri] = text
+                last_method_by_uri[uri] = "didChange"
+                _send(
+                    {
+                        "jsonrpc": "2.0",
+                        "method": "textDocument/publishDiagnostics",
+                        "params": {
+                            "uri": uri,
+                            "diagnostics": [
+                                {
+                                    "range": {
+                                        "start": {"line": 0, "character": 0},
+                                        "end": {"line": 0, "character": 1},
+                                    },
+                                    "severity": 1,
+                                    "source": "stub-lsp",
+                                    "message": "stub diagnostic",
+                                }
+                            ],
+                        },
+                    }
+                )
+            continue
+
         # Helpers for location-ish responses.
         def location(uri: str) -> dict:
             return {
@@ -125,7 +171,8 @@ def main() -> int:
                 if isinstance(td, dict) and isinstance(td.get("uri"), str):
                     uri = td["uri"]
             if uri and uri in opened:
-                respond({"contents": {"kind": "markdown", "value": "stub hover"}})
+                last = last_method_by_uri.get(uri, "")
+                respond({"contents": {"kind": "markdown", "value": f"stub hover (last={last}, watched={watched_count})"}})
             else:
                 respond(None)
             continue
