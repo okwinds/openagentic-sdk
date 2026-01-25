@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import re
+import shutil
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -33,10 +35,18 @@ class FileSessionStore:
         return session_id
 
     def session_dir(self, session_id: str) -> Path:
-        return session_dir(self.root_dir, session_id)
+        # Security: prevent path traversal (session_id becomes a path component).
+        sid = str(session_id or "").strip()
+        if not re.fullmatch(r"[0-9a-f]{32}", sid):
+            raise ValueError("invalid session_id")
+        return session_dir(self.root_dir, sid)
 
     def read_metadata(self, session_id: str) -> dict[str, Any]:
-        p = meta_path(self.root_dir, session_id)
+        try:
+            d = self.session_dir(session_id)
+        except ValueError:
+            return {}
+        p = d / "meta.json"
         if not p.exists():
             return {}
         try:
@@ -47,6 +57,47 @@ class FileSessionStore:
             return {}
         md = obj.get("metadata")
         return dict(md) if isinstance(md, dict) else {}
+
+    def read_meta_record(self, session_id: str) -> dict[str, Any]:
+        """Read the raw meta.json record for server APIs.
+
+        Back-compat: older records may omit fields.
+        """
+
+        try:
+            d = self.session_dir(session_id)
+        except ValueError:
+            return {}
+        p = d / "meta.json"
+        if not p.exists():
+            return {}
+        try:
+            obj = json.loads(p.read_text(encoding="utf-8", errors="replace"))
+        except Exception:  # noqa: BLE001
+            return {}
+        return obj if isinstance(obj, dict) else {}
+
+    def update_metadata(self, session_id: str, *, patch: dict[str, Any]) -> dict[str, Any]:
+        """Merge `patch` into the stored metadata dict and persist."""
+
+        if not isinstance(patch, dict):
+            raise ValueError("patch must be a dict")
+        rec = self.read_meta_record(session_id)
+        if not rec:
+            raise FileNotFoundError(session_id)
+        md = rec.get("metadata")
+        md2: dict[str, Any] = dict(md) if isinstance(md, dict) else {}
+        md2.update(patch)
+        rec["metadata"] = md2
+        p = self.session_dir(session_id) / "meta.json"
+        p.write_text(json.dumps(rec, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        return md2
+
+    def delete_session(self, session_id: str) -> None:
+        d = self.session_dir(session_id)
+        if not d.exists():
+            raise FileNotFoundError(session_id)
+        shutil.rmtree(d)
 
     def fork_session(self, parent_session_id: str, *, head_seq: int | None = None, metadata: dict[str, Any] | None = None) -> str:
         """Fork a session by copying events up to `head_seq`.
@@ -81,6 +132,8 @@ class FileSessionStore:
         return new_id
 
     def append_event(self, session_id: str, event: Event) -> None:
+        # Validate session id before path usage.
+        _ = self.session_dir(session_id)
         path = events_path(self.root_dir, session_id)
         path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -99,6 +152,10 @@ class FileSessionStore:
             f.write("\n")
 
     def read_events(self, session_id: str) -> list[Event]:
+        try:
+            _ = self.session_dir(session_id)
+        except ValueError:
+            return []
         path = events_path(self.root_dir, session_id)
         if not path.exists():
             return []
@@ -132,6 +189,10 @@ class FileSessionStore:
         self.append_event(session_id, SessionRedo())
 
     def _infer_next_seq(self, session_id: str) -> int:
+        try:
+            _ = self.session_dir(session_id)
+        except ValueError:
+            return 0
         path = events_path(self.root_dir, session_id)
         if not path.exists():
             return 0

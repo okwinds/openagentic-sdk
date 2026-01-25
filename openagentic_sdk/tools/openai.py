@@ -99,6 +99,21 @@ def tool_schemas_for_openai(
                 },
             },
         },
+        "List": {
+            "type": "function",
+            "function": {
+                "name": "List",
+                "description": "List files under a directory.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string"},
+                        "dir": {"type": "string"},
+                        "directory": {"type": "string"},
+                    },
+                },
+            },
+        },
         "Write": {
             "type": "function",
             "function": {

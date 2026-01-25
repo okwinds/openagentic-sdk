@@ -28,6 +28,7 @@ def _merge_hooks(a: HookEngine, b: HookEngine) -> HookEngine:
         after_model_call=[*a.after_model_call, *b.after_model_call],
         session_start=[*a.session_start, *b.session_start],
         session_end=[*a.session_end, *b.session_end],
+        session_compacting=[*a.session_compacting, *b.session_compacting],
         stop=[*a.stop, *b.stop],
         enable_message_rewrite_hooks=(a.enable_message_rewrite_hooks or b.enable_message_rewrite_hooks),
     )

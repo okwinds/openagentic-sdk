@@ -22,7 +22,7 @@ class _Provider:
         return ModelOutput(assistant_text="ok", tool_calls=(), usage={"total_tokens": 1}, raw=None)
 
 
-def _http_json(url: str, method: str, payload: dict | None = None) -> dict:
+def _http_json(url: str, method: str, payload: dict | None = None):
     data = None
     headers = {}
     if payload is not None:
@@ -31,8 +31,7 @@ def _http_json(url: str, method: str, payload: dict | None = None) -> dict:
     req = urllib.request.Request(url, method=method, data=data, headers=headers)
     with urllib.request.urlopen(req, timeout=5) as resp:
         raw = resp.read()
-    obj = json.loads(raw.decode("utf-8", errors="replace"))
-    return obj if isinstance(obj, dict) else {}
+    return json.loads(raw.decode("utf-8", errors="replace"))
 
 
 class TestHttpServerSurface(unittest.TestCase):
@@ -63,14 +62,21 @@ class TestHttpServerSurface(unittest.TestCase):
                 self.assertTrue(health.get("ok"))
 
                 created = _http_json(base + "/session", "POST", {})
-                sid = created.get("session_id")
+                sid = created.get("id")
                 self.assertIsInstance(sid, str)
 
                 resp = _http_json(base + f"/session/{sid}/message", "POST", {"prompt": "hi"})
-                self.assertEqual(resp.get("final_text"), "ok")
+                parts = resp.get("parts")
+                self.assertIsInstance(parts, list)
+                text = None
+                for p in parts:
+                    if isinstance(p, dict) and p.get("type") == "text":
+                        text = p.get("text")
+                self.assertEqual(text, "ok")
 
                 sessions = _http_json(base + "/session", "GET")
-                ids = [s.get("session_id") for s in sessions.get("sessions", []) if isinstance(s, dict)]
+                self.assertIsInstance(sessions, list)
+                ids = [s.get("id") for s in sessions if isinstance(s, dict)]
                 self.assertIn(sid, ids)
 
                 evs = _http_json(base + f"/session/{sid}/events", "GET")

@@ -96,6 +96,7 @@ class OpenAIResponsesProvider:
         *,
         model: str,
         input: Sequence[Mapping[str, Any]],
+        instructions: str | None = None,
         tools: Sequence[Mapping[str, Any]] = (),
         api_key: str | None = None,
         previous_response_id: str | None = None,
@@ -109,6 +110,8 @@ class OpenAIResponsesProvider:
         headers = _build_headers(api_key_header=self.api_key_header, api_key=api_key)
 
         payload: dict[str, Any] = {"model": model, "input": list(input), "store": bool(store)}
+        if isinstance(instructions, str) and instructions.strip():
+            payload["instructions"] = instructions
         if previous_response_id:
             payload["previous_response_id"] = previous_response_id
         if include:
@@ -156,6 +159,7 @@ class OpenAIResponsesProvider:
         *,
         model: str,
         input: Sequence[Mapping[str, Any]],
+        instructions: str | None = None,
         tools: Sequence[Mapping[str, Any]] = (),
         api_key: str | None = None,
         previous_response_id: str | None = None,
@@ -169,6 +173,8 @@ class OpenAIResponsesProvider:
         headers = _build_headers(api_key_header=self.api_key_header, api_key=api_key)
 
         payload: dict[str, Any] = {"model": model, "input": list(input), "stream": True, "store": bool(store)}
+        if isinstance(instructions, str) and instructions.strip():
+            payload["instructions"] = instructions
         if previous_response_id:
             payload["previous_response_id"] = previous_response_id
         if include:

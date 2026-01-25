@@ -1,5 +1,6 @@
 import os
 import unittest
+from tempfile import TemporaryDirectory
 
 
 class TestCliContextHook(unittest.TestCase):
@@ -7,17 +8,18 @@ class TestCliContextHook(unittest.TestCase):
         from openagentic_cli.config import build_options
 
         os.environ["RIGHTCODE_API_KEY"] = "x"
-        os.environ["OPENCODE_CONFIG_DIR"] = os.getcwd()  # isolate from user home config
         try:
-            opts = build_options(
-                cwd="C:\\proj",
-                project_dir="C:\\proj",
-                permission_mode="deny",
-                interactive=False,
-            )
+            with TemporaryDirectory() as td:
+                os.environ["OPENCODE_TEST_HOME"] = td
+                opts = build_options(
+                    cwd="C:\\proj",
+                    project_dir="C:\\proj",
+                    permission_mode="deny",
+                    interactive=False,
+                )
         finally:
             os.environ.pop("RIGHTCODE_API_KEY", None)
-            os.environ.pop("OPENCODE_CONFIG_DIR", None)
+            os.environ.pop("OPENCODE_TEST_HOME", None)
 
         msgs = [{"role": "system", "content": "BASE"}, {"role": "user", "content": "hi"}]
         out1, _, _ = self._run_before_model_call(opts, msgs)

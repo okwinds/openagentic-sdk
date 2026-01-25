@@ -65,7 +65,7 @@ class ToolOutputPruneProvider:
     async def complete(self, *, model, messages, tools=(), api_key=None):
         self._n += 1
 
-        # First call: request multiple reads that will produce large tool outputs.
+        # First prompt, first call: request multiple reads that will produce large tool outputs.
         if self._n == 1:
             calls = [
                 ToolCall(tool_use_id=f"call_{i}", name="Read", arguments={"file_path": "big.txt"})
@@ -73,12 +73,18 @@ class ToolOutputPruneProvider:
             ]
             return ModelOutput(assistant_text=None, tool_calls=calls, usage={"total_tokens": 1}, raw=None, response_id=None)
 
-        # Second call: ensure tool outputs were compacted in the rebuilt history.
+        # First prompt, second call: do not expect pruning yet (OpenCode protects the last 2 user turns).
+        if self._n == 2:
+            return ModelOutput(assistant_text="turn1", tool_calls=(), usage={"total_tokens": 2}, raw=None, response_id=None)
+
+        # Second prompt: still no pruning expected.
+        if self._n == 3:
+            return ModelOutput(assistant_text="turn2", tool_calls=(), usage={"total_tokens": 2}, raw=None, response_id=None)
+
+        # Third prompt: now old tool outputs from prompt1 are eligible for pruning.
         tool_msgs = [m for m in messages if isinstance(m, dict) and m.get("role") == "tool"]
         self.assertTrue(len(tool_msgs) >= 1)
-        # At least one tool output should be replaced with the placeholder.
         self.assertTrue(any((m.get("content") or "") == "[Old tool result content cleared]" for m in tool_msgs))
-
         return ModelOutput(assistant_text="ok", tool_calls=(), usage={"total_tokens": 2}, raw=None, response_id=None)
 
     # unittest-style assertion helpers (avoid importing unittest in provider call sites)
@@ -149,13 +155,49 @@ class TestCompactionAutoAndPrune(unittest.IsolatedAsyncioTestCase):
                 ),
             )
 
-            # Run once; provider asserts the second call receives placeholder tool outputs.
-            out = []
+            # Prompt 1: generate tool outputs.
+            out1 = []
+            session_id = ""
             async for e in query(prompt="read", options=options):
-                out.append(e)
+                out1.append(e)
+                if getattr(e, "type", "") == "system.init":
+                    session_id = getattr(e, "session_id", session_id)
+            self.assertTrue(session_id)
 
-            self.assertTrue(any(getattr(e, "type", "") == "tool.output_compacted" for e in out))
-            self.assertTrue(any(getattr(e, "type", "") == "result" for e in out))
+            # Prompt 2: add a second user turn (still protected).
+            options2 = OpenAgenticOptions(
+                provider=provider,
+                model="fake",
+                api_key="x",
+                cwd=str(root),
+                session_store=store,
+                tools=tools,
+                permission_gate=PermissionGate(permission_mode="bypass"),
+                resume=session_id,
+                compaction=options.compaction,
+            )
+            out2 = []
+            async for e in query(prompt="noop", options=options2):
+                out2.append(e)
+
+            # Prompt 3: now pruning can apply to older tool outputs.
+            options3 = OpenAgenticOptions(
+                provider=provider,
+                model="fake",
+                api_key="x",
+                cwd=str(root),
+                session_store=store,
+                tools=tools,
+                permission_gate=PermissionGate(permission_mode="bypass"),
+                resume=session_id,
+                compaction=options.compaction,
+            )
+            out3 = []
+            async for e in query(prompt="check", options=options3):
+                out3.append(e)
+
+            self.assertTrue(any(getattr(e, "type", "") == "tool.output_compacted" for e in out3))
+            self.assertTrue(any(getattr(e, "type", "") == "result" for e in out3))
 
 
 if __name__ == "__main__":

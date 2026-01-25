@@ -12,8 +12,11 @@ from ..events import (
     ToolOutputCompacted,
     ToolResult,
     ToolUse,
+    UserCompaction,
     UserMessage,
 )
+
+from ..compaction import COMPACTION_MARKER_QUESTION
 
 
 _TOOL_OUTPUT_PLACEHOLDER = "[Old tool result content cleared]"
@@ -105,6 +108,8 @@ def rebuild_messages(events: list[Event], *, max_events: int, max_bytes: int) ->
         msg: Mapping[str, Any] | None = None
         if isinstance(e, UserMessage):
             msg = {"role": "user", "content": e.text}
+        elif isinstance(e, UserCompaction):
+            msg = {"role": "user", "content": COMPACTION_MARKER_QUESTION}
         elif isinstance(e, AssistantMessage):
             msg = {"role": "assistant", "content": e.text}
         elif isinstance(e, ToolUse):
@@ -178,6 +183,8 @@ def rebuild_responses_input(events: list[Event], *, max_events: int, max_bytes: 
         item: Mapping[str, Any] | None = None
         if isinstance(e, UserMessage):
             item = {"role": "user", "content": e.text}
+        elif isinstance(e, UserCompaction):
+            item = {"role": "user", "content": COMPACTION_MARKER_QUESTION}
         elif isinstance(e, AssistantMessage):
             item = {"role": "assistant", "content": e.text}
         elif isinstance(e, ToolUse):

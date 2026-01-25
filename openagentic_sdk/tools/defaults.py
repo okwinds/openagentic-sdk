@@ -15,12 +15,14 @@ from .web_fetch import WebFetchTool
 from .web_search_tavily import WebSearchTool
 from .write import WriteTool
 from .lsp import LspTool
+from .list_dir import ListTool
 
 
 def default_tool_registry() -> ToolRegistry:
     return ToolRegistry(
         [
             ReadTool(),
+            ListTool(),
             AskUserQuestionTool(),
             WriteTool(),
             EditTool(),

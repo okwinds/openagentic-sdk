@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from .events import AssistantMessage, Event, ToolOutputCompacted, ToolResult
+from .events import AssistantMessage, Event, ToolOutputCompacted, ToolResult, ToolUse, UserCompaction, UserMessage
 from .options import CompactionOptions
 
 
@@ -129,20 +129,35 @@ def select_tool_outputs_to_prune(*, events: list[Event], compaction: CompactionO
     events2 = _filter_to_latest_summary_pivot(events)
 
     compacted_ids: set[str] = set()
+    tool_name_by_id: dict[str, str] = {}
     for e in events2:
         if isinstance(e, ToolOutputCompacted):
             tid = getattr(e, "tool_use_id", "")
             if isinstance(tid, str) and tid:
                 compacted_ids.add(tid)
+        if isinstance(e, ToolUse):
+            tid2 = getattr(e, "tool_use_id", "")
+            nm = getattr(e, "name", "")
+            if isinstance(tid2, str) and tid2 and isinstance(nm, str) and nm:
+                tool_name_by_id[tid2] = nm
 
     protect = max(0, int(compaction.protect_tool_output_tokens or 0))
     min_prune = max(0, int(compaction.min_prune_tokens or 0))
 
     total = 0
+    pruned_tokens = 0
     to_prune: list[tuple[str, int]] = []
+    turns = 0
 
-    # Walk backwards through tool results since the latest pivot.
+    # OpenCode: skip pruning until >=2 user turns are present.
     for e in reversed(events2):
+        if isinstance(e, (UserMessage, UserCompaction)):
+            turns += 1
+            continue
+        if turns < 2:
+            continue
+        if isinstance(e, AssistantMessage) and bool(getattr(e, "is_summary", False)):
+            break
         if not isinstance(e, ToolResult):
             continue
         tid = e.tool_use_id
@@ -154,12 +169,17 @@ def select_tool_outputs_to_prune(*, events: list[Event], compaction: CompactionO
         if tid in compacted_ids:
             break
 
+        tool_name = tool_name_by_id.get(tid, "")
+        if isinstance(tool_name, str) and tool_name.lower() == "skill":
+            continue
+
         cost = estimate_tokens(_safe_json_dumps(e.output))
         total += cost
         if total > protect:
+            pruned_tokens += cost
             to_prune.append((tid, cost))
 
-    prunable_tokens = sum(cost for _, cost in to_prune)
-    if prunable_tokens < min_prune:
+    # OpenCode: only apply if prunedTokens > PRUNE_MINIMUM (strict).
+    if pruned_tokens <= min_prune:
         return []
     return [tid for tid, _ in to_prune]

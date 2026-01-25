@@ -3,19 +3,22 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Mapping, Sequence
 
 from openagentic_sdk.hooks.engine import HookEngine
 from openagentic_sdk.hooks.models import HookDecision, HookMatcher
 from openagentic_sdk.opencode_config import load_merged_config
 from openagentic_sdk.options import CompactionOptions, OpenAgenticOptions
 from openagentic_sdk.plugins import load_plugins, merge_hook_engines, plugins_from_opencode_config
+from openagentic_sdk.js_plugins import load_js_plugin_tools, split_plugin_specs
 from openagentic_sdk.mcp.credentials import McpCredentialStore
+from openagentic_sdk.mcp.auth_store import McpAuthStore
 from openagentic_sdk.permissions.gate import PermissionGate
 from openagentic_sdk.permissions.interactive import InteractiveApprover
 from openagentic_sdk.providers.openai_responses import OpenAIResponsesProvider
 from openagentic_sdk.tools.defaults import default_tool_registry
 from openagentic_sdk.custom_tools import load_custom_tools
+from openagentic_sdk.js_tools import load_js_tools
 
 
 def require_env(name: str) -> str:
@@ -43,6 +46,13 @@ def _env_float(name: str, default: float) -> float:
         return float(raw)
     except ValueError as e:
         raise SystemExit(f"Invalid {name}={raw!r}; expected float") from e
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None or raw == "":
+        return default
+    return str(raw).strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
 def build_provider_rightcode() -> OpenAIResponsesProvider:
@@ -79,7 +89,7 @@ def build_options(
     platform = sys.platform
     project_dir2 = project_dir or cwd
 
-    async def _inject_cli_context(payload: dict) -> HookDecision:  # type: ignore[type-arg]
+    async def _inject_cli_context(payload: Mapping[str, Any]) -> HookDecision:
         msgs = payload.get("messages")
         if not isinstance(msgs, list) or not msgs:
             return HookDecision()
@@ -131,14 +141,12 @@ def build_options(
 
     # Plugins (OpenCode parity): merge plugin-provided hooks/tools.
     plugin_specs = plugins_from_opencode_config(cfg)
-    loaded = load_plugins(plugin_specs, project_dir=project_dir2) if plugin_specs else None
+    py_plugin_specs, js_plugin_specs = split_plugin_specs(plugin_specs, project_dir=project_dir2) if plugin_specs else ([], [])
+    loaded = load_plugins(py_plugin_specs, project_dir=project_dir2) if py_plugin_specs else None
     if loaded is not None:
         hooks = merge_hook_engines(hooks, loaded.hooks)
 
     tools = default_tool_registry()
-    if loaded is not None:
-        for t in loaded.tools:
-            tools.register(t)
 
     # Custom tools (OpenCode parity): load from on-disk tool directories.
     try:
@@ -147,11 +155,41 @@ def build_options(
     except Exception:
         pass
 
+    # JS/TS custom tools (OpenCode parity): disabled by default (explicit opt-in).
+    experimental = cfg.get("experimental") if isinstance(cfg, dict) else None
+    js_tools_enabled = False
+    if isinstance(experimental, dict):
+        js_tools_enabled = bool(experimental.get("js_tools") or experimental.get("jsTools"))
+    js_tools_enabled = bool(js_tools_enabled or _env_bool("OA_ENABLE_JS_TOOLS", default=False))
+    try:
+        for t in load_js_tools(project_dir=project_dir2, enabled=js_tools_enabled):
+            tools.register(t)
+    except Exception:
+        pass
+
+    # Plugin tools (OpenCode parity): register after custom tools.
+    if loaded is not None:
+        for t in loaded.tools:
+            tools.register(t)
+
+    # JS/TS plugin tools (OpenCode parity): file:// only, disabled by default.
+    js_plugins_enabled = False
+    if isinstance(experimental, dict):
+        js_plugins_enabled = bool(experimental.get("js_plugins") or experimental.get("jsPlugins"))
+    js_plugins_enabled = bool(js_plugins_enabled or _env_bool("OA_ENABLE_JS_PLUGINS", default=False))
+    if js_plugins_enabled and js_plugin_specs:
+        try:
+            for t in load_js_plugin_tools(plugin_specs=js_plugin_specs, project_dir=project_dir2, enabled=True):
+                tools.register(t)
+        except Exception:
+            pass
+
     # MCP servers (OpenCode parity): load from config and merge stored credentials.
     mcp_servers: dict[str, object] | None = None
     mcp_cfg = cfg.get("mcp") if isinstance(cfg, dict) else None
     if isinstance(mcp_cfg, dict) and mcp_cfg:
         store = McpCredentialStore.load_default()
+        auth_store = McpAuthStore.load_default()
         mcp_servers = {}
         for key, spec in mcp_cfg.items():
             if not isinstance(key, str) or not key:
@@ -169,7 +207,15 @@ def build_options(
                 if not isinstance(url, str) or not url:
                     continue
                 headers = spec.get("headers") if isinstance(spec.get("headers"), dict) else None
-                merged = store.merged_headers(key, {str(k): str(v) for k, v in (headers or {}).items()})
+                base = {str(k): str(v) for k, v in (headers or {}).items()}
+
+                # Prefer OAuth access tokens (mcp-auth.json) if present and URL matches.
+                entry = auth_store.get_for_url(key, server_url=url)
+                if entry is not None and entry.tokens is not None:
+                    if entry.tokens.access_token and "authorization" not in {k.lower() for k in base.keys()}:
+                        base["Authorization"] = f"Bearer {entry.tokens.access_token}"
+
+                merged = store.merged_headers(key, base)
                 mcp_servers[key] = {"type": "remote", "url": url, "headers": merged}
 
     provider_obj = build_provider_rightcode()

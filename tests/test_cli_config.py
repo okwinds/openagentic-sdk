@@ -1,5 +1,6 @@
 import os
 import unittest
+from tempfile import TemporaryDirectory
 
 
 class TestCliConfig(unittest.TestCase):
@@ -7,37 +8,40 @@ class TestCliConfig(unittest.TestCase):
         from openagentic_cli.config import build_options
 
         os.environ["RIGHTCODE_API_KEY"] = "x"
-        os.environ["OPENCODE_CONFIG_DIR"] = os.getcwd()  # isolate from user home config
         try:
-            opts = build_options(
-                cwd=".",
-                project_dir=".",
-                permission_mode="prompt",
-            )
+            with TemporaryDirectory() as td:
+                # Isolate from user home config (OpenCode-style).
+                os.environ["OPENCODE_TEST_HOME"] = td
+                opts = build_options(
+                    cwd=".",
+                    project_dir=".",
+                    permission_mode="prompt",
+                )
             self.assertIsNotNone(opts.provider)
             self.assertEqual(opts.model, os.environ.get("RIGHTCODE_MODEL", "gpt-5.2"))
         finally:
             os.environ.pop("RIGHTCODE_API_KEY", None)
-            os.environ.pop("OPENCODE_CONFIG_DIR", None)
+            os.environ.pop("OPENCODE_TEST_HOME", None)
 
     def test_interactive_prompt_has_approver(self) -> None:
         from openagentic_cli.config import build_options
 
         os.environ["RIGHTCODE_API_KEY"] = "x"
-        os.environ["OPENCODE_CONFIG_DIR"] = os.getcwd()  # isolate from user home config
         try:
-            opts = build_options(
-                cwd=".",
-                project_dir=".",
-                permission_mode="prompt",
-                interactive=True,
-            )
+            with TemporaryDirectory() as td:
+                os.environ["OPENCODE_TEST_HOME"] = td
+                opts = build_options(
+                    cwd=".",
+                    project_dir=".",
+                    permission_mode="prompt",
+                    interactive=True,
+                )
             self.assertTrue(opts.permission_gate.interactive)
             self.assertIsNotNone(opts.permission_gate.interactive_approver)
             self.assertTrue(opts.include_partial_messages)
         finally:
             os.environ.pop("RIGHTCODE_API_KEY", None)
-            os.environ.pop("OPENCODE_CONFIG_DIR", None)
+            os.environ.pop("OPENCODE_TEST_HOME", None)
 
 
 if __name__ == "__main__":

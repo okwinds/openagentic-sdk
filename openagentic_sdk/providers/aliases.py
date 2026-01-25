@@ -34,6 +34,7 @@ class ResponsesProviderAlias:
         *,
         model: str,
         input: Sequence[Mapping[str, Any]],
+        instructions: str | None = None,
         tools: Sequence[Mapping[str, Any]] = (),
         api_key: str | None = None,
         previous_response_id: str | None = None,
@@ -53,6 +54,7 @@ class ResponsesProviderAlias:
         return await inner.complete(
             model=model,
             input=input,
+            instructions=instructions,
             tools=tools,
             api_key=api_key,
             previous_response_id=previous_response_id,
@@ -65,6 +67,7 @@ class ResponsesProviderAlias:
         *,
         model: str,
         input: Sequence[Mapping[str, Any]],
+        instructions: str | None = None,
         tools: Sequence[Mapping[str, Any]] = (),
         api_key: str | None = None,
         previous_response_id: str | None = None,
@@ -84,6 +87,7 @@ class ResponsesProviderAlias:
         async for ev in inner.stream(
             model=model,
             input=input,
+            instructions=instructions,
             tools=tools,
             api_key=api_key,
             previous_response_id=previous_response_id,

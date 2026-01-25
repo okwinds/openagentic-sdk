@@ -25,7 +25,8 @@ class TestSystemPromptLayering(unittest.TestCase):
                 model="gpt-test",
                 cwd=str(root),
                 project_dir=str(root),
-                setting_sources=["project"],
+                # Enable OpenCode parity prompt system AND OpenAgentic `.claude` compatibility blocks.
+                setting_sources=["project", "claude"],
                 system_prompt="BASE SYSTEM",
                 instruction_files=["rules-extra.md"],
             )

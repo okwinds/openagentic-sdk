@@ -7,6 +7,7 @@ from pathlib import Path
 
 from openagentic_sdk.paths import default_session_root
 from openagentic_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.server.http_server import serve_http
 
 from .args import build_parser
 from .config import build_options
@@ -110,8 +111,10 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if sub == "auth":
             name = str(getattr(ns, "name", "") or "")
-            token = str(getattr(ns, "token", "") or "")
-            sys.stdout.write(cmd_mcp_auth(name=name, token=token) + "\n")
+            token = getattr(ns, "token", None)
+            token2 = str(token) if isinstance(token, str) and token.strip() else None
+            callback_port = int(getattr(ns, "callback_port", 19876) or 19876)
+            sys.stdout.write(cmd_mcp_auth(cwd=cwd, name=name, token=token2, callback_port=callback_port) + "\n")
             sys.stdout.flush()
             return 0
         if sub == "logout":
@@ -121,6 +124,18 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         parser.error("missing or unknown mcp subcommand")
         return 2
+
+    if ns.command == "serve":
+        host = str(getattr(ns, "host", "127.0.0.1") or "127.0.0.1")
+        port = int(getattr(ns, "port", 4096) or 4096)
+        opts = build_options(
+            cwd=cwd,
+            project_dir=project_dir,
+            permission_mode=permission_mode,
+            interactive=interactive,
+        )
+        serve_http(options=opts, host=host, port=port)
+        return 0
 
     parser.error(f"command not implemented: {ns.command}")
     return 2

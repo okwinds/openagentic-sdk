@@ -31,26 +31,29 @@ class TestCliProviderSelection(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            os.environ["OPENCODE_CONFIG_DIR"] = str(root / "global")
+            home = root / "home"
+            os.environ["OPENCODE_TEST_HOME"] = str(home)
             os.environ["OA_PROVIDER"] = "p1"
             # Ensure we don't depend on RIGHTCODE_* env vars.
             os.environ.pop("RIGHTCODE_API_KEY", None)
 
-            (root / "opencode.json").write_text(
+            cfg_dir = home / ".config" / "opencode"
+            cfg_dir.mkdir(parents=True)
+            (cfg_dir / "opencode.json").write_text(
                 """
-{
-  "provider": {
-    "p1": {
-      "options": {
-        "baseURL": "http://127.0.0.1:1234",
-        "apiKey": "from-config",
-        "timeout": 1000
-      }
-    }
-  },
-  "model": "m"
-}
-""".strip()
+ {
+   "provider": {
+     "p1": {
+       "options": {
+         "baseURL": "http://127.0.0.1:1234",
+         "apiKey": "from-config",
+         "timeout": 1000
+       }
+     }
+   },
+   "model": "m"
+ }
+ """.strip()
                 + "\n",
                 encoding="utf-8",
             )
@@ -58,7 +61,7 @@ class TestCliProviderSelection(unittest.TestCase):
             opts = build_options(cwd=str(root), project_dir=str(root), permission_mode="deny")
             self.assertEqual(opts.api_key, "from-config")
             self.assertEqual(getattr(opts.provider, "base_url", None), "http://127.0.0.1:1234")
-        os.environ.pop("OPENCODE_CONFIG_DIR", None)
+        os.environ.pop("OPENCODE_TEST_HOME", None)
         os.environ.pop("OA_PROVIDER", None)
 
 

@@ -26,8 +26,58 @@ class HookEngine:
     after_model_call: Sequence[HookMatcher] = ()
     session_start: Sequence[HookMatcher] = ()
     session_end: Sequence[HookMatcher] = ()
+    # OpenCode parity: plugins can influence compaction prompt/context.
+    session_compacting: Sequence[HookMatcher] = ()
     stop: Sequence[HookMatcher] = ()
     enable_message_rewrite_hooks: bool = False
+
+    async def run_session_compacting(
+        self, *, output: Any, context: Mapping[str, Any]
+    ) -> tuple[Any, list[HookEvent], HookDecision | None]:
+        current_output: Any = output
+        hook_events: list[HookEvent] = []
+        for matcher in self.session_compacting:
+            matched = _match_name(matcher.tool_name_pattern, "SessionCompacting")
+            started = time.time()
+            decision: HookDecision | None = None
+            action: str | None = None
+            callbacks = [*([matcher.hook] if matcher.hook is not None else []), *list(matcher.hooks)]
+            if matched and callbacks:
+                for cb in callbacks:
+                    payload = {
+                        "output": current_output,
+                        "context": dict(context),
+                        "hook_point": "SessionCompacting",
+                    }
+                    if matcher.timeout_s is not None:
+                        decision = await asyncio.wait_for(cb(payload), timeout=float(matcher.timeout_s))
+                    else:
+                        decision = await cb(payload)
+                    action = decision.action or action
+                    if decision.block:
+                        hook_events.append(
+                            HookEvent(
+                                hook_point="SessionCompacting",
+                                name=matcher.name,
+                                matched=True,
+                                duration_ms=(time.time() - started) * 1000,
+                                action=action or "block",
+                            )
+                        )
+                        return current_output, hook_events, decision
+                    if decision.override_tool_output is not None:
+                        current_output = decision.override_tool_output
+                        action = action or "rewrite_compaction"
+            hook_events.append(
+                HookEvent(
+                    hook_point="SessionCompacting",
+                    name=matcher.name,
+                    matched=matched,
+                    duration_ms=(time.time() - started) * 1000,
+                    action=action,
+                )
+            )
+        return current_output, hook_events, None
 
     async def run_pre_tool_use(
         self,

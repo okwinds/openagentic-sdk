@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import json
+import os
 import re
 import time
 from dataclasses import dataclass
@@ -29,11 +30,13 @@ from .mcp.wrappers import (
     wrap_http_mcp_prompts,
     wrap_http_mcp_resources,
     wrap_http_mcp_tools,
+    wrap_stdio_mcp_prompts,
+    wrap_stdio_mcp_resources,
     wrap_stdio_mcp_tools,
 )
 from .options import OpenAgenticOptions
 from .paths import default_session_root
-from .prompt_system import build_system_prompt_text
+from .prompt_system import BuiltSystemPrompt, build_system_prompt
 from .compaction import (
     COMPACTION_MARKER_QUESTION,
     COMPACTION_SYSTEM_PROMPT,
@@ -51,8 +54,11 @@ from .tools.openai import tool_schemas_for_openai
 from .tools.openai_responses import tool_schemas_for_responses
 from .tools.task import TaskTool
 from .commands import load_command_template
+from .opencode_markdown import FILE_REGEX
 
 import shlex
+import asyncio
+import uuid
 
 
 def _callable_accepts_kw(fn: Any, name: str) -> bool:
@@ -63,6 +69,19 @@ def _callable_accepts_kw(fn: Any, name: str) -> bool:
     if name in sig.parameters:
         return True
     return any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+
+
+def _tool_result_payload(ev: "ToolResult") -> Any:
+    # Provider protocols only get `output`, so on errors we must serialize the
+    # error fields too (otherwise the model sees `null`).
+    if not getattr(ev, "is_error", False):
+        return getattr(ev, "output", None)
+    return {
+        "is_error": True,
+        "error_type": getattr(ev, "error_type", None),
+        "error_message": getattr(ev, "error_message", None),
+        "output": getattr(ev, "output", None),
+    }
 
 
 def _filter_supported_kwargs(fn: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -113,14 +132,25 @@ def _default_session_root() -> Path:
     return default_session_root()
 
 
-def _build_project_system_prompt(options: OpenAgenticOptions) -> str | None:
+def _build_project_system_prompt(options: OpenAgenticOptions) -> BuiltSystemPrompt:
     """Backwards-compatible wrapper.
 
-    Historically we only injected `.claude` memory + commands when `setting_sources`
-    included "project". We now unify system prompt building in `prompt_system`.
+    The system prompt builder now returns both the system text and any
+    Responses-level `instructions` (used for Codex OAuth sessions).
     """
 
-    return build_system_prompt_text(options)
+    return build_system_prompt(options)
+
+
+def _base_system_role_for_model(*, model_id: str, provider_protocol: str) -> str:
+    if provider_protocol != "responses":
+        return "system"
+    mid = (model_id or "").lower()
+    # Match OpenCode's openai-compatible Responses adapter defaults:
+    # reasoning families prefer developer role.
+    if mid.startswith("o") or "gpt-5" in mid or mid.startswith("codex-") or mid.startswith("computer-use"):
+        return "developer"
+    return "system"
 
 
 _EXEC_SKILL_RE = re.compile(
@@ -196,8 +226,52 @@ def _no_tool_call_found_for_call_output_error(e: BaseException) -> bool:
     return "no tool call found for function call output" in msg_l and "call_id" in msg_l
 
 
-def _looks_like_only_function_call_output(items: Sequence[Mapping[str, Any]]) -> bool:
-    return bool(items) and all(isinstance(i, dict) and i.get("type") == "function_call_output" for i in items)
+def _extract_function_call_outputs(items: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    """Extract Responses tool outputs from an input list.
+
+    Some hook pipelines may prepend role-based messages (system/developer) even
+    when the runtime is in Responses incremental mode and is trying to send only
+    `function_call_output` items.
+
+    For retry/fallback logic we want to:
+    - detect when the input effectively contains only tool outputs (plus optional
+      system/developer role messages)
+    - re-send a combined `function_call` + `function_call_output` input without
+      accidentally placing role-based items in the middle of Responses items.
+    """
+
+    outs: list[Mapping[str, Any]] = []
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        if it.get("type") == "function_call_output":
+            outs.append(it)
+    return outs
+
+
+def _looks_like_outputs_without_calls(items: Sequence[Mapping[str, Any]]) -> bool:
+    """True when `items` contains tool outputs but no matching tool calls.
+
+    We allow role-based system/developer messages to be present (some hooks
+    prepend them), but we consider any other non-output item a mismatch.
+    """
+
+    outs = 0
+    for it in items:
+        if not isinstance(it, dict):
+            return False
+        if it.get("type") == "function_call_output":
+            outs += 1
+            continue
+        if it.get("type") == "function_call":
+            return False
+        role = it.get("role")
+        if role in {"system", "developer"}:
+            continue
+        # Unknown item (could be user/assistant/other Responses item) - don't
+        # treat this as an output-only continuation.
+        return False
+    return outs > 0
 
 
 def _prepend_function_calls_for_responses(tool_calls: Sequence[ToolCall], outputs: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
@@ -229,12 +303,13 @@ class AgentRuntime:
 
     def _with_base_system(self, items: list[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
         sys_prompt = getattr(self, "_base_system_prompt", None)
+        sys_role = getattr(self, "_base_system_role", None) or "system"
         if not isinstance(sys_prompt, str) or not sys_prompt.strip():
             return items
-        if items and isinstance(items[0], dict) and items[0].get("role") == "system":
+        if items and isinstance(items[0], dict) and items[0].get("role") == sys_role:
             # The runtime keeps the base system prompt stable by rewriting index 0.
-            return [{"role": "system", "content": sys_prompt}, *items[1:]]
-        return [{"role": "system", "content": sys_prompt}, *items]
+            return [{"role": sys_role, "content": sys_prompt}, *items[1:]]
+        return [{"role": sys_role, "content": sys_prompt}, *items]
 
     def _rebuild_provider_input(
         self,
@@ -314,11 +389,32 @@ class AgentRuntime:
             )
         )
 
+        # OpenCode parity: allow plugins to inject compaction context/prompt.
+        compacting = {"context": [], "prompt": None}
+        out2, hook_events, decision = await options.hooks.run_session_compacting(
+            output=compacting,
+            context={"session_id": session_id, "agent_name": self._agent_name},
+        )
+        for he in hook_events:
+            store.append_event(session_id, he)
+            yield he
+        if decision is not None and decision.block:
+            return
+        compacting2 = out2 if isinstance(out2, dict) else compacting
+        ctx_items = compacting2.get("context") if isinstance(compacting2, dict) else None
+        ctx_list = [str(x) for x in ctx_items] if isinstance(ctx_items, list) else []
+        prompt_override = compacting2.get("prompt") if isinstance(compacting2, dict) else None
+        if isinstance(prompt_override, str) and prompt_override.strip():
+            prompt_text = prompt_override.strip()
+        else:
+            prompt_text = "\n\n".join([COMPACTION_USER_INSTRUCTION, *ctx_list]).strip()
+
+        # The compaction marker question is already present in history (rebuild
+        # renders UserCompaction as "What did we do so far?").
         compaction_input: list[Mapping[str, Any]] = [
             {"role": "system", "content": COMPACTION_SYSTEM_PROMPT},
             *history,
-            {"role": "user", "content": COMPACTION_MARKER_QUESTION},
-            {"role": "user", "content": COMPACTION_USER_INSTRUCTION},
+            {"role": "user", "content": prompt_text},
         ]
 
         if provider_protocol == "legacy":
@@ -354,19 +450,49 @@ class AgentRuntime:
         yield msg
 
     def _expand_command_args(self, template: str, args: str) -> str:
-        tpl = template
-        raw_args = args or ""
-        tpl = tpl.replace("$ARGUMENTS", raw_args)
-        try:
-            parts = shlex.split(raw_args)
-        except Exception:  # noqa: BLE001
-            parts = raw_args.split()
+        import re
 
-        # Replace $1..$n (1-based).
-        for i in range(1, 21):
-            val = parts[i - 1] if i - 1 < len(parts) else ""
-            tpl = tpl.replace(f"${i}", val)
-        return tpl
+        raw_args = args or ""
+
+        # OpenCode tokenization: [Image N] is one token, quoted strings are one
+        # token, otherwise split by whitespace.
+        args_regex = re.compile(r'(?:\[Image\s+\d+\]|"[^"]*"|\'[^\']*\'|[^\s"\']+)', re.IGNORECASE)
+        quote_trim = re.compile(r"^['\"]|['\"]$")
+
+        raw = args_regex.findall(raw_args)
+        parts = [quote_trim.sub("", x) for x in raw]
+
+        placeholder_regex = re.compile(r"\$(\d+)")
+        placeholders = placeholder_regex.findall(template)
+        last = 0
+        for s in placeholders:
+            try:
+                n = int(s)
+            except Exception:  # noqa: BLE001
+                continue
+            if n > last:
+                last = n
+
+        def repl(m: re.Match[str]) -> str:
+            try:
+                position = int(m.group(1))
+            except Exception:  # noqa: BLE001
+                return ""
+            arg_index = position - 1
+            if arg_index >= len(parts) or arg_index < 0:
+                return ""
+            if position == last:
+                return " ".join(parts[arg_index:])
+            return parts[arg_index]
+
+        with_args = placeholder_regex.sub(repl, template)
+        uses_arguments_placeholder = "$ARGUMENTS" in template
+        out = with_args.replace("$ARGUMENTS", raw_args)
+
+        if not placeholders and not uses_arguments_placeholder and raw_args.strip():
+            out = out + "\n\n" + raw_args
+
+        return out
 
     async def _render_slash_command(
         self,
@@ -375,10 +501,10 @@ class AgentRuntime:
         tool_use_id: str,
         name: str,
         args: str,
-    ) -> tuple[str, list[str]]:
+    ) -> tuple[str, list[str], list[dict[str, Any]]]:
         """Render a slash command template with file/shell expansions.
 
-        Returns (rendered_text, sources).
+        Returns (rendered_text, sources, parts).
         """
 
         options = self._options
@@ -387,82 +513,178 @@ class AgentRuntime:
         if tmpl is None:
             raise FileNotFoundError(f"SlashCommand: not found: {name}")
 
+        is_subtask = bool(getattr(tmpl, "subtask", None) is True)
+
         text = self._expand_command_args(tmpl.content, args)
 
         sources = [tmpl.source]
 
-        # Expand @file tokens using the Read tool through the normal tool pipeline.
-        # We keep the pattern intentionally conservative.
+        # Expand inline shell snippets: !`cmd`.
         import re as _re
 
-        file_pat = _re.compile(r"@([A-Za-z0-9_./\\-]+)")
-        file_refs = list(dict.fromkeys(file_pat.findall(text)))
-        for i, ref in enumerate(file_refs):
+        bash_regex = _re.compile(r"!`([^`]+)`")
+        shell_matches = list(bash_regex.finditer(text))
+        if shell_matches:
+            if options.allowed_tools is not None and "Bash" not in set(options.allowed_tools):
+                raise RuntimeError("SlashCommand: Bash tool is not allowed")
+
+            approvals: list[tuple[str, dict[str, Any]]] = []
+            for i, m in enumerate(shell_matches):
+                cmd = (m.group(1) or "").strip()
+                approval = await options.permission_gate.approve(
+                    "Bash",
+                    {"command": cmd, "workdir": options.cwd, "description": "SlashCommand shell"},
+                    context={
+                        "session_id": session_id,
+                        "tool_use_id": f"{tool_use_id}:bash:{i}",
+                        "agent_name": self._agent_name,
+                    },
+                )
+                if not approval.allowed:
+                    raise RuntimeError("SlashCommand: Bash not approved")
+                approvals.append((cmd, dict(approval.updated_input or {"command": cmd, "workdir": options.cwd})))
+
+            async def _run_bash(inp: dict[str, Any]) -> str:
+                tool = options.tools.get("Bash")
+                try:
+                    out_obj = await tool.run(inp, ToolContext(cwd=options.cwd, project_dir=options.project_dir))
+                except Exception as e:  # noqa: BLE001
+                    return f"Error executing command: {e}"
+                if isinstance(out_obj, dict):
+                    s = out_obj.get("stdout")
+                    if isinstance(s, str):
+                        return s
+                return ""
+
+            results = await asyncio.gather(*[_run_bash(inp) for _, inp in approvals])
+            idx = 0
+
+            def _sub(_: _re.Match[str]) -> str:
+                nonlocal idx
+                out = results[idx] if idx < len(results) else ""
+                idx += 1
+                return out
+
+            text = bash_regex.sub(_sub, text)
+
+        text = text.strip()
+
+        # OpenCode resolvePromptParts(): keep structured parts (text + file:// + agent).
+        parts: list[dict[str, Any]] = [{"type": "text", "text": text}]
+        if is_subtask:
+            # Subtask commands only forward the prompt text (no file parts).
+            agent_name = getattr(tmpl, "agent", None)
+            if not isinstance(agent_name, str) or not agent_name:
+                agent_name = name
+            parts = [
+                {
+                    "type": "subtask",
+                    "agent": agent_name,
+                    "description": getattr(tmpl, "description", None) if isinstance(getattr(tmpl, "description", None), str) else "",
+                    "command": name,
+                    "prompt": text,
+                    "model": getattr(tmpl, "model", None) if isinstance(getattr(tmpl, "model", None), str) else None,
+                }
+            ]
+
+        refs = [m.group(1) for m in FILE_REGEX.finditer(text) if m.group(1)]
+        refs = list(dict.fromkeys(refs))
+
+        appended: list[str] = []
+
+        def _find_worktree_root(start: Path) -> Path:
+            cur = start.resolve()
+            for p in [cur, *cur.parents]:
+                if (p / ".git").exists():
+                    return p
+            return Path(cur.anchor or "/").resolve()
+
+        worktree = _find_worktree_root(Path(options.project_dir or options.cwd).expanduser().resolve())
+        for i, ref in enumerate(refs):
+            if not isinstance(ref, str) or not ref:
+                continue
+
+            # @agent / @file (OpenCode resolves relative to worktree).
+            ref_path = ref
+            if ref_path.startswith("~/"):
+                home = Path(os.environ.get("OPENCODE_TEST_HOME") or Path.home()).expanduser().resolve()
+                ref_path = str(home / ref_path[2:])
+            p = Path(ref_path)
+            if not p.is_absolute():
+                p = worktree / p
+            p = p.expanduser().resolve()
+
+            if not p.exists():
+                if ref in (options.agents or {}):
+                    if not is_subtask:
+                        parts.append({"type": "agent", "name": ref})
+                    appended.append(
+                        "Agent reference: "
+                        + ref
+                        + "\n"
+                        + "Use the above message and context to generate a prompt and call the Task tool with subagent: "
+                        + ref
+                    )
+                continue
+
+            if not is_subtask:
+                parts.append(
+                    {
+                        "type": "file",
+                        "url": "file://" + str(p),
+                        "filename": ref,
+                        "mime": "application/x-directory" if p.is_dir() else "text/plain",
+                    }
+                )
+
+            if is_subtask:
+                continue
+
+            if p.is_dir():
+                if options.allowed_tools is not None and "List" not in set(options.allowed_tools):
+                    raise RuntimeError("SlashCommand: List tool is not allowed")
+                approval = await options.permission_gate.approve(
+                    "List",
+                    {"path": str(p)},
+                    context={"session_id": session_id, "tool_use_id": f"{tool_use_id}:list:{i}", "agent_name": self._agent_name},
+                )
+                if not approval.allowed:
+                    raise RuntimeError("SlashCommand: List not approved")
+                tool = options.tools.get("List")
+                out_obj = await tool.run(approval.updated_input or {"path": str(p)}, ToolContext(cwd=options.cwd, project_dir=options.project_dir))
+                out = out_obj.get("output") if isinstance(out_obj, dict) else None
+                appended.append(
+                    "Called the list tool with the following input: "
+                    + json.dumps({"path": str(p)}, ensure_ascii=False)
+                    + "\n"
+                    + (out if isinstance(out, str) else "")
+                )
+                continue
+
+            # Default: treat as text/plain and inline via Read tool.
             if options.allowed_tools is not None and "Read" not in set(options.allowed_tools):
                 raise RuntimeError("SlashCommand: Read tool is not allowed")
-
             approval = await options.permission_gate.approve(
                 "Read",
-                {"file_path": ref},
+                {"file_path": str(p)},
                 context={"session_id": session_id, "tool_use_id": f"{tool_use_id}:read:{i}", "agent_name": self._agent_name},
             )
             if not approval.allowed:
                 raise RuntimeError("SlashCommand: Read not approved")
-
             tool = options.tools.get("Read")
-            out_obj = await tool.run(approval.updated_input or {"file_path": ref}, ToolContext(cwd=options.cwd, project_dir=options.project_dir))
-            content = ""
-            if isinstance(out_obj, dict):
-                c = out_obj.get("content")
-                if isinstance(c, str):
-                    content = c
-            text = text.replace(f"@{ref}", content)
-
-        # Expand inline !shell by executing via Bash tool with permission checks.
-        lines = text.splitlines()
-        out_lines: list[str] = []
-        shell_idx = 0
-        for line in lines:
-            if "!" not in line:
-                out_lines.append(line)
-                continue
-            idx = line.find("!")
-            cmd = line[idx + 1 :].strip()
-            if not cmd:
-                out_lines.append(line)
-                continue
-
-            if options.allowed_tools is not None and "Bash" not in set(options.allowed_tools):
-                raise RuntimeError("SlashCommand: Bash tool is not allowed")
-
-            approval = await options.permission_gate.approve(
-                "Bash",
-                {"command": cmd, "workdir": options.cwd, "description": "SlashCommand inline shell"},
-                context={
-                    "session_id": session_id,
-                    "tool_use_id": f"{tool_use_id}:bash:{shell_idx}",
-                    "agent_name": self._agent_name,
-                },
+            out_obj = await tool.run(approval.updated_input or {"file_path": str(p)}, ToolContext(cwd=options.cwd, project_dir=options.project_dir))
+            content = out_obj.get("content") if isinstance(out_obj, dict) else None
+            appended.append(
+                "Called the Read tool with the following input: "
+                + json.dumps({"file_path": str(p)}, ensure_ascii=False)
+                + "\n"
+                + (content if isinstance(content, str) else "")
             )
-            if not approval.allowed:
-                raise RuntimeError("SlashCommand: Bash not approved")
 
-            tool = options.tools.get("Bash")
-            out_obj = await tool.run(
-                approval.updated_input
-                or {"command": cmd, "workdir": options.cwd, "description": "SlashCommand inline shell"},
-                ToolContext(cwd=options.cwd, project_dir=options.project_dir),
-            )
-            shell_idx += 1
-            out = ""
-            if isinstance(out_obj, dict):
-                o = out_obj.get("output")
-                if isinstance(o, str):
-                    out = o.strip()
-            out_lines.append(line[:idx] + out)
-
-        rendered = "\n".join(out_lines)
-        return rendered, sources
+        rendered = text
+        if appended and not is_subtask:
+            rendered = (rendered + "\n\n" + "\n\n".join([b for b in appended if b.strip()])).strip()
+        return rendered, sources, parts
 
     async def query(self, prompt: str) -> AsyncIterator[Any]:
         options = self._options
@@ -487,13 +709,43 @@ class AgentRuntime:
                         if not isinstance(cmd, list) or not all(isinstance(x, str) and x for x in cmd):
                             continue
                         client = StdioMcpClient(command=list(cmd), environment=env, cwd=options.cwd)
-                        await client.start()
-                        tools = await client.list_tools()
+                        try:
+                            await client.start()
+                            tools = await client.list_tools()
+                        except Exception:
+                            # Non-fatal: allow sessions to run even if an MCP server is down.
+                            try:
+                                await client.close()
+                            except Exception:
+                                pass
+                            continue
+
                         for w in wrap_stdio_mcp_tools(str(server_key), client=client, tools=tools):
                             try:
                                 options.tools.get(w.name)
                             except KeyError:
                                 options.tools.register(w)
+
+                        # Prompts/resources are part of the MCP surface too.
+                        try:
+                            prompts = await client.list_prompts()
+                            for w in wrap_stdio_mcp_prompts(str(server_key), client=client, prompts=prompts):
+                                try:
+                                    options.tools.get(w.name)
+                                except KeyError:
+                                    options.tools.register(w)
+                        except Exception:
+                            pass
+
+                        try:
+                            resources = await client.list_resources()
+                            for w in wrap_stdio_mcp_resources(str(server_key), client=client, resources=resources):
+                                try:
+                                    options.tools.get(w.name)
+                                except KeyError:
+                                    options.tools.register(w)
+                        except Exception:
+                            pass
                         mcp_clients.append(client)
 
                     if isinstance(cfg, dict) and cfg.get("type") == "remote":
@@ -501,27 +753,45 @@ class AgentRuntime:
                         if not isinstance(url, str) or not url:
                             continue
                         headers = cfg.get("headers") if isinstance(cfg.get("headers"), dict) else None
-                        client2 = RemoteMcpClient(url=url, headers={str(k): str(v) for k, v in (headers or {}).items()})
-                        tools2 = await client2.list_tools()
+                        client2 = RemoteMcpClient(
+                            url=url,
+                            headers={str(k): str(v) for k, v in (headers or {}).items()},
+                            server_key=str(server_key),
+                        )
+                        try:
+                            tools2 = await client2.list_tools()
+                        except Exception:
+                            try:
+                                await client2.close()
+                            except Exception:
+                                pass
+                            continue
+
                         for w in wrap_http_mcp_tools(str(server_key), client=client2, tools=tools2):
                             try:
                                 options.tools.get(w.name)
                             except KeyError:
                                 options.tools.register(w)
 
-                        for w in wrap_http_mcp_prompts(str(server_key), client=client2, prompts=await client2.list_prompts()):
-                            try:
-                                options.tools.get(w.name)
-                            except KeyError:
-                                options.tools.register(w)
+                        try:
+                            for w in wrap_http_mcp_prompts(str(server_key), client=client2, prompts=await client2.list_prompts()):
+                                try:
+                                    options.tools.get(w.name)
+                                except KeyError:
+                                    options.tools.register(w)
+                        except Exception:
+                            pass
 
-                        for w in wrap_http_mcp_resources(
-                            str(server_key), client=client2, resources=await client2.list_resources()
-                        ):
-                            try:
-                                options.tools.get(w.name)
-                            except KeyError:
-                                options.tools.register(w)
+                        try:
+                            for w in wrap_http_mcp_resources(
+                                str(server_key), client=client2, resources=await client2.list_resources()
+                            ):
+                                try:
+                                    options.tools.get(w.name)
+                                except KeyError:
+                                    options.tools.register(w)
+                        except Exception:
+                            pass
 
                         remote_mcp_clients.append(client2)
 
@@ -605,10 +875,18 @@ class AgentRuntime:
                 store.append_event(session_id, he)
                 yield he
 
-            sys_prompt = _build_project_system_prompt(options)
+            provider_protocol: str = resume_protocol or _detect_provider_protocol(options.provider)
+
+            built = _build_project_system_prompt(options)
+            sys_prompt = built.system_text
+            sys_role = _base_system_role_for_model(model_id=options.model, provider_protocol=provider_protocol)
+            if built.is_codex_session:
+                sys_role = "user"
             if sys_prompt:
-                messages.insert(0, {"role": "system", "content": sys_prompt})
+                messages.insert(0, {"role": sys_role, "content": sys_prompt})
             self._base_system_prompt = sys_prompt
+            self._base_system_role = sys_role if sys_prompt else None
+            self._base_instructions = built.instructions
 
             prompt2, hook_events0, decision0 = await options.hooks.run_user_prompt_submit(
                 prompt=prompt,
@@ -636,6 +914,37 @@ class AgentRuntime:
             prompt3 = _maybe_expand_execute_skill_prompt(prompt2, options)
             prompt3 = _maybe_expand_list_skills_prompt(prompt3, options)
 
+            # OpenCode-style direct slash command execution: if the user typed
+            # `/name ...` and the command exists, expand it before sending to the
+            # model (no tool call required).
+            if isinstance(prompt3, str) and prompt3.lstrip().startswith("/"):
+                s = prompt3.lstrip()
+                # Only consider the first line for command parsing; remaining
+                # lines are preserved as part of the args.
+                first, *rest = s.splitlines()
+                first = first.strip()
+                if first.startswith("/") and len(first) > 1:
+                    parts = first[1:].split(None, 1)
+                    cmd_name = parts[0].strip() if parts else ""
+                    cmd_args = (parts[1] if len(parts) > 1 else "")
+                    if rest:
+                        cmd_args = (cmd_args + "\n" + "\n".join(rest)).strip()
+
+                    if cmd_name:
+                        try:
+                            project_dir = options.project_dir or options.cwd
+                            if load_command_template(name=cmd_name, project_dir=str(project_dir)) is not None:
+                                rendered, _, _ = await self._render_slash_command(
+                                    session_id=session_id,
+                                    tool_use_id=f"usercmd:{uuid.uuid4().hex}",
+                                    name=cmd_name,
+                                    args=cmd_args,
+                                )
+                                prompt3 = rendered
+                        except Exception:  # noqa: BLE001
+                            # Fall back to raw prompt if expansion fails.
+                            pass
+
             store.append_event(
                 session_id,
                 UserMessage(
@@ -646,7 +955,7 @@ class AgentRuntime:
             )
             messages.append({"role": "user", "content": prompt3})
 
-            provider_protocol: str = resume_protocol or _detect_provider_protocol(options.provider)
+            # provider_protocol is computed before first system prompt injection.
             steps = 0
             while steps < options.max_steps:
                 if options.abort_event is not None and getattr(options.abort_event, "is_set", lambda: False)():
@@ -701,9 +1010,10 @@ class AgentRuntime:
                         options=options,
                     )
 
-                if getattr(self, "_base_system_prompt", None) and messages and messages[0].get("role") == "system":
+                base_role = getattr(self, "_base_system_role", None) or "system"
+                if getattr(self, "_base_system_prompt", None) and messages and messages[0].get("role") == base_role:
                     messages[0] = {
-                        "role": "system",
+                        "role": base_role,
                         "content": self._base_system_prompt,  # type: ignore[arg-type]
                     }
 
@@ -755,6 +1065,7 @@ class AgentRuntime:
                         else:
                             can_thread = supports_previous_response_id and _callable_accepts_kw(stream_fn, "previous_response_id")
                             prev_id = previous_response_id if can_thread else None
+                            instructions = getattr(self, "_base_instructions", None)
                             kwargs = {
                                 "model": options.model,
                                 "input": messages,
@@ -762,6 +1073,7 @@ class AgentRuntime:
                                 "api_key": options.api_key,
                                 "previous_response_id": prev_id,
                                 "store": True,
+                                "instructions": instructions,
                             }
                             stream_iter = stream_fn(**_filter_supported_kwargs(stream_fn, kwargs))
 
@@ -814,10 +1126,11 @@ class AgentRuntime:
                             )
                             if can_retry:
                                 supports_previous_response_id = False
-                                if pending_responses_tool_calls and pending_responses_history and _looks_like_only_function_call_output(messages):
+                                if pending_responses_tool_calls and pending_responses_history and _looks_like_outputs_without_calls(messages):
+                                    outs = _extract_function_call_outputs(messages)
                                     messages = [
                                         *list(pending_responses_history),
-                                        *_prepend_function_calls_for_responses(pending_responses_tool_calls, messages),
+                                        *_prepend_function_calls_for_responses(pending_responses_tool_calls, outs),
                                     ]
                                 continue
                             raise
@@ -848,6 +1161,7 @@ class AgentRuntime:
                         model_out = await complete_fn(**_filter_supported_kwargs(complete_fn, kwargs))
                     else:
                         prev_id = previous_response_id if supports_previous_response_id else None
+                        instructions = getattr(self, "_base_instructions", None)
                         try:
                             kwargs = {
                                 "model": options.model,
@@ -856,6 +1170,7 @@ class AgentRuntime:
                                 "api_key": options.api_key,
                                 "previous_response_id": prev_id,
                                 "store": True,
+                                "instructions": instructions,
                             }
                             model_out = await complete_fn(**_filter_supported_kwargs(complete_fn, kwargs))
                         except RuntimeError as e:
@@ -865,10 +1180,11 @@ class AgentRuntime:
                             if not can_retry:
                                 raise
                             supports_previous_response_id = False
-                            if pending_responses_tool_calls and pending_responses_history and _looks_like_only_function_call_output(messages):
+                            if pending_responses_tool_calls and pending_responses_history and _looks_like_outputs_without_calls(messages):
+                                outs = _extract_function_call_outputs(messages)
                                 messages = [
                                     *list(pending_responses_history),
-                                    *_prepend_function_calls_for_responses(pending_responses_tool_calls, messages),
+                                    *_prepend_function_calls_for_responses(pending_responses_tool_calls, outs),
                                 ]
                             kwargs = {
                                 "model": options.model,
@@ -877,6 +1193,7 @@ class AgentRuntime:
                                 "api_key": options.api_key,
                                 "previous_response_id": None,
                                 "store": True,
+                                "instructions": instructions,
                             }
                             model_out = await complete_fn(**_filter_supported_kwargs(complete_fn, kwargs))
 
@@ -923,7 +1240,13 @@ class AgentRuntime:
                             async for e in self._run_tool_call(session_id=session_id, tool_call=tc, store=store, hooks=options.hooks):
                                 yield e
                                 if isinstance(e, ToolResult):
-                                    messages.append({"role": "tool", "tool_call_id": tc.tool_use_id, "content": json.dumps(e.output, ensure_ascii=False)})
+                                    messages.append(
+                                        {
+                                            "role": "tool",
+                                            "tool_call_id": tc.tool_use_id,
+                                            "content": json.dumps(_tool_result_payload(e), ensure_ascii=False),
+                                        }
+                                    )
                         continue
 
                     if supports_previous_response_id:
@@ -933,7 +1256,11 @@ class AgentRuntime:
                                 yield e
                                 if isinstance(e, ToolResult):
                                     tool_output_items.append(
-                                        {"type": "function_call_output", "call_id": tc.tool_use_id, "output": json.dumps(e.output, ensure_ascii=False)}
+                                        {
+                                            "type": "function_call_output",
+                                            "call_id": tc.tool_use_id,
+                                            "output": json.dumps(_tool_result_payload(e), ensure_ascii=False),
+                                        }
                                     )
                         if model_out.response_id:
                             previous_response_id = model_out.response_id
@@ -946,7 +1273,13 @@ class AgentRuntime:
                         async for e in self._run_tool_call(session_id=session_id, tool_call=tc, store=store, hooks=options.hooks):
                             yield e
                             if isinstance(e, ToolResult):
-                                messages.append({"type": "function_call_output", "call_id": tc.tool_use_id, "output": json.dumps(e.output, ensure_ascii=False)})
+                                messages.append(
+                                    {
+                                        "type": "function_call_output",
+                                        "call_id": tc.tool_use_id,
+                                        "output": json.dumps(_tool_result_payload(e), ensure_ascii=False),
+                                    }
+                                )
                     continue
 
                 if model_out.assistant_text is None:
@@ -1474,7 +1807,7 @@ class AgentRuntime:
                     raise ValueError("SlashCommand: 'name' must be a non-empty string")
                 if not isinstance(args, str):
                     args = str(args)
-                rendered, sources = await self._render_slash_command(
+                rendered, sources, parts = await self._render_slash_command(
                     session_id=session_id,
                     tool_use_id=tool_call.tool_use_id,
                     name=name,
@@ -1485,6 +1818,7 @@ class AgentRuntime:
                     "args": args,
                     "sources": sources,
                     "content": rendered,
+                    "parts": parts,
                 }
                 output2, post_events, post_decision = await hooks.run_post_tool_use(
                     tool_name=tool_name,

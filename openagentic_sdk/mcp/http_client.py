@@ -6,6 +6,8 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from urllib.parse import urlparse
+
 
 def _post_json(url: str, payload: Mapping[str, Any], headers: Mapping[str, str] | None, *, timeout_s: float) -> Mapping[str, Any]:
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -27,6 +29,13 @@ class HttpMcpClient:
     headers: Mapping[str, str] | None = None
     timeout_s: float = 10.0
     _next_id: int = 1
+
+    def __post_init__(self) -> None:
+        u = urlparse(str(self.url or ""))
+        if u.scheme not in ("http", "https"):
+            raise ValueError(f"mcp http: unsupported url scheme: {u.scheme}")
+        if not u.netloc:
+            raise ValueError("mcp http: missing hostname")
 
     async def _request(self, method: str, params: Mapping[str, Any] | None = None) -> Mapping[str, Any]:
         rid = self._next_id
@@ -55,13 +64,15 @@ class HttpMcpClient:
             return {"text": "", "raw": result}
         content = result.get("content")
         text_parts: list[str] = []
+        content_list: list[dict[str, Any]] = []
         if isinstance(content, list):
+            content_list = [c for c in content if isinstance(c, dict)]
             for item in content:
                 if isinstance(item, dict) and item.get("type") == "text":
                     t = item.get("text")
                     if isinstance(t, str):
                         text_parts.append(t)
-        return {"text": "".join(text_parts), "raw": result}
+        return {"text": "".join(text_parts), "content": content_list, "raw": result}
 
     async def list_prompts(self) -> list[dict[str, Any]]:
         resp = await self._request("prompts/list")
@@ -82,13 +93,15 @@ class HttpMcpClient:
             return {"text": "", "raw": result}
         content = result.get("content")
         text_parts: list[str] = []
+        content_list: list[dict[str, Any]] = []
         if isinstance(content, list):
+            content_list = [c for c in content if isinstance(c, dict)]
             for item in content:
                 if isinstance(item, dict) and item.get("type") == "text":
                     t = item.get("text")
                     if isinstance(t, str):
                         text_parts.append(t)
-        return {"text": "".join(text_parts), "raw": result}
+        return {"text": "".join(text_parts), "content": content_list, "raw": result}
 
     async def list_resources(self) -> list[dict[str, Any]]:
         resp = await self._request("resources/list")
@@ -109,10 +122,12 @@ class HttpMcpClient:
             return {"text": "", "raw": result}
         content = result.get("content")
         text_parts: list[str] = []
+        content_list: list[dict[str, Any]] = []
         if isinstance(content, list):
+            content_list = [c for c in content if isinstance(c, dict)]
             for item in content:
                 if isinstance(item, dict) and item.get("type") == "text":
                     t = item.get("text")
                     if isinstance(t, str):
                         text_parts.append(t)
-        return {"text": "".join(text_parts), "raw": result}
+        return {"text": "".join(text_parts), "content": content_list, "raw": result}

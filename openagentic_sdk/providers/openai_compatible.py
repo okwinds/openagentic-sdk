@@ -189,6 +189,7 @@ class OpenAICompatibleProvider:
         *,
         model: str,
         input: Sequence[Mapping[str, Any]],
+        instructions: str | None = None,
         tools: Sequence[Mapping[str, Any]] = (),
         api_key: str | None = None,
         previous_response_id: str | None = None,
@@ -206,6 +207,8 @@ class OpenAICompatibleProvider:
             headers[self.api_key_header] = api_key
 
         payload: dict[str, Any] = {"model": model, "input": list(input), "store": bool(store)}
+        if isinstance(instructions, str) and instructions.strip():
+            payload["instructions"] = instructions
         if previous_response_id:
             payload["previous_response_id"] = previous_response_id
         if include:
@@ -248,6 +251,7 @@ class OpenAICompatibleProvider:
         *,
         model: str,
         input: Sequence[Mapping[str, Any]],
+        instructions: str | None = None,
         tools: Sequence[Mapping[str, Any]] = (),
         api_key: str | None = None,
         previous_response_id: str | None = None,
@@ -270,6 +274,8 @@ class OpenAICompatibleProvider:
             "stream": True,
             "store": bool(store),
         }
+        if isinstance(instructions, str) and instructions.strip():
+            payload["instructions"] = instructions
         if previous_response_id:
             payload["previous_response_id"] = previous_response_id
         if include:

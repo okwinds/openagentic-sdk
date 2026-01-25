@@ -40,7 +40,8 @@ class TestRuntimeSkillInjection(unittest.IsolatedAsyncioTestCase):
                 cwd=str(root),
                 session_store=store,
                 permission_gate=PermissionGate(permission_mode="bypass"),
-                setting_sources=["project"],
+                # Enable OpenCode parity prompt system AND OpenAgentic `.claude` compatibility blocks.
+                setting_sources=["project", "claude"],
                 project_dir=str(root),
             )
 

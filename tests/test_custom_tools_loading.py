@@ -36,11 +36,13 @@ TOOLS = [HelloTool()]
 
             os.environ["RIGHTCODE_API_KEY"] = "x"
             os.environ["OPENCODE_CONFIG_DIR"] = str(root / "empty-global")
+            os.environ["OPENCODE_TEST_HOME"] = str(root / "home")
             try:
                 opts = build_options(cwd=str(root), project_dir=str(root), permission_mode="deny")
             finally:
                 os.environ.pop("RIGHTCODE_API_KEY", None)
                 os.environ.pop("OPENCODE_CONFIG_DIR", None)
+                os.environ.pop("OPENCODE_TEST_HOME", None)
 
             self.assertIn("Hello", opts.tools.names())
 

@@ -33,9 +33,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_mcp_list = mcp_sub.add_parser("list", help="List MCP servers from config")
     _ = p_mcp_list
 
-    p_mcp_auth = mcp_sub.add_parser("auth", help="Store a bearer token for a remote MCP server")
+    p_mcp_auth = mcp_sub.add_parser("auth", help="Authenticate to a remote MCP server (OAuth by default)")
     p_mcp_auth.add_argument("name", help="MCP server name (key under config.mcp)")
-    p_mcp_auth.add_argument("--token", required=True, help="Bearer token")
+    p_mcp_auth.add_argument("--token", required=False, default=None, help="Bearer token (manual mode; skips OAuth)")
+    p_mcp_auth.add_argument(
+        "--callback-port",
+        required=False,
+        default=19876,
+        type=int,
+        help="OAuth callback port (default: 19876)",
+    )
 
     p_mcp_logout = mcp_sub.add_parser("logout", help="Clear stored credentials for an MCP server")
     p_mcp_logout.add_argument("name", help="MCP server name (key under config.mcp)")
@@ -53,6 +60,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_shared = sub.add_parser("shared", help="Print a shared session payload")
     p_shared.add_argument("share_id", help="Share id to fetch")
+
+    p_serve = sub.add_parser("serve", help="Run the local OpenAgentic HTTP server")
+    p_serve.add_argument("--host", default="127.0.0.1", help="Bind host (default: 127.0.0.1)")
+    p_serve.add_argument("--port", default=4096, type=int, help="Bind port (default: 4096)")
 
     return parser
 

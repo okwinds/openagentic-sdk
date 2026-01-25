@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import asyncio
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -47,7 +48,9 @@ class BashTool(Tool):
             timeout_s = float(timeout_ms) / 1000.0
         else:
             timeout_s = float(tool_input.get("timeout_s", self.timeout_s))
-        proc = subprocess.run(
+        # Run in a worker thread so shell calls don't block the event loop.
+        proc = await asyncio.to_thread(
+            subprocess.run,
             self._shell_argv(command),
             cwd=str(run_cwd),
             capture_output=True,
