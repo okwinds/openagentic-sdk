@@ -96,12 +96,24 @@ Optional (recommended): install ripgrep (`rg`) so the agent can search your repo
 
 Commands:
 
-- `oa chat` (multi-turn REPL; `/help` for slash commands)
+ - `oa chat` (multi-turn REPL; `/help` for commands; multi-line paste is submitted as one turn on TTYs, or use `/paste` ... `/end`)
 - `oa run "prompt"` (`--json`, `--no-stream`)
 - `oa resume <session_id>` (alias of `oa chat --resume <session_id>`)
 - `oa logs <session_id>` (summarize `events.jsonl`)
 
+Server + integrations:
+
+- `oa serve --port 4096` (local HTTP server)
+- `oa --port 4096` (alias of `oa serve --port 4096` for OpenCode VSCode parity)
+- `oa acp` (ACP stdio server)
+- `oa github install` (generate a GitHub Actions workflow)
+- `oa github run` (GitHub Actions runner)
+
 Sessions are stored under `~/.openagentic-sdk` by default (override with `OPENAGENTIC_SDK_HOME`).
+
+For user-facing OpenCode parity docs, see:
+
+- `docs/guides/opencode-parity-v2/README.md`
 
 ## Publishing
 

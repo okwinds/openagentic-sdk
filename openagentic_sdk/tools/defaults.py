@@ -1,25 +1,28 @@
 from __future__ import annotations
 
+from .ask_user_question import AskUserQuestionTool
 from .bash import BashTool
 from .edit import EditTool
 from .glob import GlobTool
 from .grep import GrepTool
-from .ask_user_question import AskUserQuestionTool
+from .notebook_edit import NotebookEditTool
 from .read import ReadTool
 from .registry import ToolRegistry
-from .slash_command import SlashCommandTool
 from .skill import SkillTool
-from .notebook_edit import NotebookEditTool
+from .slash_command import SlashCommandTool
+from .todo_write import TodoWriteTool
 from .web_fetch import WebFetchTool
 from .web_search_tavily import WebSearchTool
 from .write import WriteTool
-from .todo_write import TodoWriteTool
+from .lsp import LspTool
+from .list_dir import ListTool
 
 
 def default_tool_registry() -> ToolRegistry:
     return ToolRegistry(
         [
             ReadTool(),
+            ListTool(),
             AskUserQuestionTool(),
             WriteTool(),
             EditTool(),
@@ -32,5 +35,6 @@ def default_tool_registry() -> ToolRegistry:
             SlashCommandTool(),
             SkillTool(),
             TodoWriteTool(),
+            LspTool(),
         ]
     )

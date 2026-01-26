@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Mapping, Optional, Sequence
 
-
 HookCallback = Callable[[Mapping[str, Any]], Awaitable["HookDecision"]]
 
 

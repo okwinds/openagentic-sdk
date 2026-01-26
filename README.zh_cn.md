@@ -75,12 +75,24 @@ uv run oa chat
 
 常用命令：
 
-- `oa chat`（多轮 REPL，输入 `/help` 查看内置 slash commands）
+- `oa chat`（多轮 REPL；输入 `/help` 查看命令；TTY 下粘贴多行会作为一次输入，或使用 `/paste` ... `/end`）
 - `oa run "prompt"`（支持 `--json`、`--no-stream`）
 - `oa resume <session_id>`（等价于 `oa chat --resume <session_id>`）
 - `oa logs <session_id>`（汇总 `events.jsonl`）
 
+服务端与集成：
+
+- `oa serve --port 4096`（本地 HTTP server）
+- `oa --port 4096`（OpenCode VSCode 兼容：等价于 `oa serve --port 4096`）
+- `oa acp`（ACP stdio server）
+- `oa github install`（生成 GitHub Actions workflow）
+- `oa github run`（GitHub Actions runner）
+
 默认会话目录为 `~/.openagentic-sdk`（可用 `OPENAGENTIC_SDK_HOME` 覆盖）。
+
+更多 OpenCode parity 的用户文档见：
+
+- `docs/guides/opencode-parity-v2/README.md`
 
 示例默认需要环境变量（至少要有 `RIGHTCODE_API_KEY`）。在 PowerShell 下可以这样检查：
 

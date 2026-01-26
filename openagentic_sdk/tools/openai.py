@@ -99,6 +99,21 @@ def tool_schemas_for_openai(
                 },
             },
         },
+        "List": {
+            "type": "function",
+            "function": {
+                "name": "List",
+                "description": "List files under a directory.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string"},
+                        "dir": {"type": "string"},
+                        "directory": {"type": "string"},
+                    },
+                },
+            },
+        },
         "Write": {
             "type": "function",
             "function": {
@@ -242,10 +257,16 @@ def tool_schemas_for_openai(
             "type": "function",
             "function": {
                 "name": "SlashCommand",
-                "description": "Load a .claude slash command by name.",
+                "description": "Load and render a slash command by name (opencode-compatible).",
                 "parameters": {
                     "type": "object",
-                    "properties": {"name": {"type": "string"}, "project_dir": {"type": "string"}},
+                    "properties": {
+                        "name": {"type": "string"},
+                        "args": {"type": "string"},
+                        # CAS / legacy aliases:
+                        "arguments": {"type": "string"},
+                        "project_dir": {"type": "string"},
+                    },
                     "required": ["name"],
                 },
             },

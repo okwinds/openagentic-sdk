@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Mapping, Optional, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from .base import ModelOutput, ToolCall
 from .openai_compatible import _default_stream_transport, _default_transport  # noqa: PLC2701
 from .sse import parse_sse_events
 from .stream_events import DoneEvent, TextDeltaEvent, ToolCallEvent
-
 
 Transport = Callable[[str, Mapping[str, str], Mapping[str, Any]], Mapping[str, Any]]
 StreamTransport = Callable[[str, Mapping[str, str], Mapping[str, Any]], Iterable[bytes]]
@@ -97,6 +96,7 @@ class OpenAIResponsesProvider:
         *,
         model: str,
         input: Sequence[Mapping[str, Any]],
+        instructions: str | None = None,
         tools: Sequence[Mapping[str, Any]] = (),
         api_key: str | None = None,
         previous_response_id: str | None = None,
@@ -110,6 +110,8 @@ class OpenAIResponsesProvider:
         headers = _build_headers(api_key_header=self.api_key_header, api_key=api_key)
 
         payload: dict[str, Any] = {"model": model, "input": list(input), "store": bool(store)}
+        if isinstance(instructions, str) and instructions.strip():
+            payload["instructions"] = instructions
         if previous_response_id:
             payload["previous_response_id"] = previous_response_id
         if include:
@@ -157,6 +159,7 @@ class OpenAIResponsesProvider:
         *,
         model: str,
         input: Sequence[Mapping[str, Any]],
+        instructions: str | None = None,
         tools: Sequence[Mapping[str, Any]] = (),
         api_key: str | None = None,
         previous_response_id: str | None = None,
@@ -170,6 +173,8 @@ class OpenAIResponsesProvider:
         headers = _build_headers(api_key_header=self.api_key_header, api_key=api_key)
 
         payload: dict[str, Any] = {"model": model, "input": list(input), "stream": True, "store": bool(store)}
+        if isinstance(instructions, str) and instructions.strip():
+            payload["instructions"] = instructions
         if previous_response_id:
             payload["previous_response_id"] = previous_response_id
         if include:

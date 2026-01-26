@@ -1,0 +1,167 @@
+from __future__ import annotations
+
+import asyncio
+import threading
+from dataclasses import dataclass, field
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import Any
+from urllib.parse import parse_qs, urlparse
+
+
+@dataclass
+class OAuthCallbackServer:
+    """Local loopback OAuth callback server.
+
+    OpenCode uses a fixed port/path (`127.0.0.1:19876/mcp/oauth/callback`).
+    For tests we allow `port=0` (ephemeral).
+    """
+
+    host: str = "127.0.0.1"
+    port: int = 19876
+    path: str = "/mcp/oauth/callback"
+
+    _srv: ThreadingHTTPServer | None = None
+    _thread: threading.Thread | None = None
+    _loop: asyncio.AbstractEventLoop | None = None
+    _pending: dict[str, asyncio.Future[str]] = field(default_factory=dict)
+    _pending_lock: threading.Lock = field(default_factory=threading.Lock)
+
+    @property
+    def redirect_uri(self) -> str:
+        s = self._srv
+        port = self.port
+        if s is not None:
+            try:
+                port = int(s.server_address[1])
+            except Exception:  # noqa: BLE001
+                port = self.port
+        return f"http://{self.host}:{port}{self.path}"
+
+    async def start(self) -> None:
+        if self._srv is not None:
+            return
+        self._loop = asyncio.get_running_loop()
+
+        parent = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, format: str, *args: Any) -> None:  # noqa: A002,ANN401
+                # Never log to stderr (and never log secrets).
+                _ = (format, args)
+                return
+
+            def do_GET(self) -> None:  # noqa: N802
+                code, body = parent._handle_callback_path(self.path)
+                self.send_response(code)
+                self.end_headers()
+                if body:
+                    self.wfile.write(body)
+
+        srv = ThreadingHTTPServer((self.host, self.port), Handler)
+        srv.daemon_threads = True
+        self._srv = srv
+        # Update port in case of ephemeral.
+        self.port = int(srv.server_address[1])
+
+        def _run() -> None:
+            try:
+                srv.serve_forever(poll_interval=0.25)
+            except Exception:
+                return
+
+        t = threading.Thread(target=_run, name="oa-mcp-oauth-callback", daemon=True)
+        self._thread = t
+        t.start()
+
+    def _handle_callback_path(self, raw_path: str) -> tuple[int, bytes]:
+        """Handle an inbound callback request path.
+
+        Returns (status_code, response_body). This is split out for unit tests so we can
+        validate locking and callback resolution without binding a real socket.
+        """
+
+        u = urlparse(raw_path)
+        if u.path != self.path:
+            return 404, b""
+
+        qs = parse_qs(u.query)
+        state = (qs.get("state") or [""])[0]
+        code = (qs.get("code") or [""])[0]
+        err = (qs.get("error") or [""])[0]
+        err_desc = (qs.get("error_description") or [""])[0]
+
+        if not state:
+            return 400, b"Missing required state parameter"
+
+        with self._pending_lock:
+            fut = self._pending.pop(state, None)
+        if fut is None:
+            return 400, b"Invalid or expired state parameter"
+
+        # Resolve promise (thread-safe via loop).
+        loop = self._loop
+        if not fut.done():
+            if err:
+                msg = err_desc or err
+                if loop is not None:
+                    loop.call_soon_threadsafe(fut.set_exception, RuntimeError(msg))
+                else:
+                    fut.set_exception(RuntimeError(msg))
+            else:
+                if loop is not None:
+                    loop.call_soon_threadsafe(fut.set_result, code)
+                else:
+                    fut.set_result(code)
+
+        return 200, b"OAuth complete. You may close this window."
+
+    async def close(self) -> None:
+        srv = self._srv
+        self._srv = None
+        if srv is not None:
+            try:
+                srv.shutdown()
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                srv.server_close()
+            except Exception:  # noqa: BLE001
+                pass
+
+        t = self._thread
+        self._thread = None
+        if t is not None and t.is_alive():
+            await asyncio.to_thread(t.join, 1.0)
+
+        # Fail any pending waiters.
+        with self._pending_lock:
+            pending = list(self._pending.items())
+            self._pending.clear()
+        for _state, fut in pending:
+            if not fut.done():
+                fut.set_exception(RuntimeError("oauth callback server closed"))
+
+    async def wait_for_callback(self, state: str, *, timeout_s: float = 300.0) -> str:
+        if not state:
+            raise ValueError("state must be non-empty")
+        await self.start()
+
+        loop = asyncio.get_running_loop()
+        fut: asyncio.Future[str] = loop.create_future()
+        with self._pending_lock:
+            if state in self._pending:
+                raise RuntimeError("callback already pending for state")
+            self._pending[state] = fut
+
+        def _timeout() -> None:
+            if fut.done():
+                return
+            with self._pending_lock:
+                self._pending.pop(state, None)
+            fut.set_exception(TimeoutError("oauth callback timeout"))
+
+        h = loop.call_later(float(timeout_s), _timeout)
+        try:
+            return await fut
+        finally:
+            h.cancel()

@@ -90,6 +90,11 @@ class ConsoleRenderer:
                 self.stream.flush()
                 self._saw_delta = False
                 return
+            # Compaction summaries are stored in the session log to enable
+            # post-pivot context rebuilding, but they are not meant to be shown
+            # as user-facing assistant output in the interactive console.
+            if bool(getattr(ev, "is_summary", False)) and not self.debug:
+                return
             text = getattr(ev, "text", "")
             if isinstance(text, str) and text:
                 agent = getattr(ev, "agent_name", None)

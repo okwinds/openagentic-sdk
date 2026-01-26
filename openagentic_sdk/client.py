@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import uuid
 from dataclasses import replace
 from pathlib import Path
@@ -10,8 +9,8 @@ from typing import Any, AsyncIterable, AsyncIterator
 from .message_query import query_messages
 from .messages import Message, ResultMessage
 from .options import OpenAgenticOptions
-from .prompting import coerce_prompt
 from .paths import default_session_root
+from .prompting import coerce_prompt
 from .sessions.store import FileSessionStore
 
 

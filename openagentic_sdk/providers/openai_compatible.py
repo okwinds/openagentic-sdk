@@ -2,15 +2,14 @@ from __future__ import annotations
 
 import json
 import time
-import urllib.request
 import urllib.error
+import urllib.request
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Mapping, Optional, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from .base import ModelOutput, ToolCall
 from .sse import parse_sse_events
 from .stream_events import DoneEvent, TextDeltaEvent, ToolCallEvent
-
 
 Transport = Callable[[str, Mapping[str, str], Mapping[str, Any]], Mapping[str, Any]]
 StreamTransport = Callable[[str, Mapping[str, str], Mapping[str, Any]], Iterable[bytes]]
@@ -190,6 +189,7 @@ class OpenAICompatibleProvider:
         *,
         model: str,
         input: Sequence[Mapping[str, Any]],
+        instructions: str | None = None,
         tools: Sequence[Mapping[str, Any]] = (),
         api_key: str | None = None,
         previous_response_id: str | None = None,
@@ -207,6 +207,8 @@ class OpenAICompatibleProvider:
             headers[self.api_key_header] = api_key
 
         payload: dict[str, Any] = {"model": model, "input": list(input), "store": bool(store)}
+        if isinstance(instructions, str) and instructions.strip():
+            payload["instructions"] = instructions
         if previous_response_id:
             payload["previous_response_id"] = previous_response_id
         if include:
@@ -249,6 +251,7 @@ class OpenAICompatibleProvider:
         *,
         model: str,
         input: Sequence[Mapping[str, Any]],
+        instructions: str | None = None,
         tools: Sequence[Mapping[str, Any]] = (),
         api_key: str | None = None,
         previous_response_id: str | None = None,
@@ -271,6 +274,8 @@ class OpenAICompatibleProvider:
             "stream": True,
             "store": bool(store),
         }
+        if isinstance(instructions, str) and instructions.strip():
+            payload["instructions"] = instructions
         if previous_response_id:
             payload["previous_response_id"] = previous_response_id
         if include:

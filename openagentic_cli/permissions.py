@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import os
 import re
 from dataclasses import dataclass
@@ -8,7 +7,6 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from openagentic_sdk.permissions.gate import PermissionGate
-
 
 PromptFn = Callable[[str], bool]
 

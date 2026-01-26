@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Mapping, Optional
 
 from ..events import UserQuestion
-from .interactive import InteractiveApprover
 from .cas import CanUseTool, PermissionResultAllow, PermissionResultDeny, ToolPermissionContext
+from .interactive import InteractiveApprover
 
 Approver = Callable[[str, Mapping[str, Any], Mapping[str, Any]], Awaitable[bool]]
 UserAnswerer = Callable[[UserQuestion], Awaitable[str]]

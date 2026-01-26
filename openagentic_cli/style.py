@@ -5,7 +5,6 @@ import sys
 from dataclasses import dataclass
 from typing import Literal
 
-
 ANSI_RESET = "\x1b[0m"
 ANSI_FG_DEFAULT = "\x1b[39m"
 ANSI_FG_GREEN = "\x1b[32m"

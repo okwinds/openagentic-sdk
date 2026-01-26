@@ -24,8 +24,10 @@ class TestProjectSystemPromptSkills(unittest.TestCase):
                 project_dir=str(root),
                 setting_sources=["project"],
             )
-            sys_prompt = _build_project_system_prompt(opts)
-            self.assertIsNone(sys_prompt)
+            built = _build_project_system_prompt(opts)
+            # The system prompt may exist (env block, config rules, etc), but it
+            # should not enumerate skills.
+            self.assertNotIn("demo", built.system_text or "")
 
 
 if __name__ == "__main__":

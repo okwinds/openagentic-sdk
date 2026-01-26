@@ -8,10 +8,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any, Callable, Mapping
 
 from .base import Tool, ToolContext
-
 
 SearchTransport = Callable[[str, Mapping[str, str], Mapping[str, Any]], Mapping[str, Any]]
 
