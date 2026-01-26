@@ -96,7 +96,7 @@ Optional (recommended): install ripgrep (`rg`) so the agent can search your repo
 
 Commands:
 
-- `oa chat` (multi-turn REPL; `/help` for slash commands)
+ - `oa chat` (multi-turn REPL; `/help` for commands; multi-line paste is submitted as one turn on TTYs, or use `/paste` ... `/end`)
 - `oa run "prompt"` (`--json`, `--no-stream`)
 - `oa resume <session_id>` (alias of `oa chat --resume <session_id>`)
 - `oa logs <session_id>` (summarize `events.jsonl`)

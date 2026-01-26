@@ -75,7 +75,7 @@ uv run oa chat
 
 常用命令：
 
-- `oa chat`（多轮 REPL，输入 `/help` 查看内置 slash commands）
+- `oa chat`（多轮 REPL；输入 `/help` 查看命令；TTY 下粘贴多行会作为一次输入，或使用 `/paste` ... `/end`）
 - `oa run "prompt"`（支持 `--json`、`--no-stream`）
 - `oa resume <session_id>`（等价于 `oa chat --resume <session_id>`）
 - `oa logs <session_id>`（汇总 `events.jsonl`）

@@ -15,7 +15,7 @@ Audience:
 
 - Multi-turn chat (creates/uses a session):
 
-  `oa chat`
+  `oa chat` (multi-line paste is one turn on TTYs; use `/paste` ... `/end` as fallback)
 
 - Resume an existing session:
 
