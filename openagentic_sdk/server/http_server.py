@@ -107,7 +107,11 @@ def _read_json(handler: BaseHTTPRequestHandler) -> dict[str, Any]:
     if length > max_bytes:
         raise ValueError("payload_too_large")
     raw = handler.rfile.read(length)
-    obj = json.loads(raw.decode("utf-8", errors="replace"))
+    try:
+        obj = json.loads(raw.decode("utf-8", errors="replace"))
+    except json.JSONDecodeError as e:
+        _ = e
+        raise ValueError("invalid_json") from e
     return obj if isinstance(obj, dict) else {}
 
 
@@ -118,6 +122,21 @@ def _write_json(handler: BaseHTTPRequestHandler, status: int, obj: Any) -> None:
     handler.send_header("Content-Length", str(len(raw)))
     handler.end_headers()
     handler.wfile.write(raw)
+
+
+def _read_json_or_write_error(handler: BaseHTTPRequestHandler) -> dict[str, Any] | None:
+    try:
+        return _read_json(handler)
+    except ValueError as e:
+        msg = str(e)
+        if msg == "payload_too_large":
+            _write_json(handler, 413, {"error": "payload_too_large"})
+            return None
+        if msg == "invalid_json":
+            _write_json(handler, 400, {"error": "invalid_json"})
+            return None
+        _write_json(handler, 400, {"error": "invalid_request"})
+        return None
 
 
 def _write_text(handler: BaseHTTPRequestHandler, status: int, text: str, *, content_type: str = "text/plain; charset=utf-8") -> None:
@@ -768,10 +787,8 @@ class OpenAgenticHttpServer:
 
                 # OpenCode parity: VSCode extension "append prompt" bridge.
                 if parts == ["tui", "append-prompt"]:
-                    try:
-                        body = _read_json(self)
-                    except ValueError:
-                        _write_json(self, 413, {"error": "payload_too_large"})
+                    body = _read_json_or_write_error(self)
+                    if body is None:
                         return
                     prompt = body.get("text") or body.get("prompt") or body.get("content")
                     if not isinstance(prompt, str) or not prompt:
@@ -803,10 +820,8 @@ class OpenAgenticHttpServer:
                 # OpenCode parity: permission and question queues.
                 if len(parts) == 3 and parts[0] == "permission" and parts[2] == "reply":
                     request_id = parts[1]
-                    try:
-                        body = _read_json(self)
-                    except ValueError:
-                        _write_json(self, 413, {"error": "payload_too_large"})
+                    body = _read_json_or_write_error(self)
+                    if body is None:
                         return
                     reply = body.get("reply")
                     if not isinstance(reply, str) or not reply:
@@ -822,10 +837,8 @@ class OpenAgenticHttpServer:
 
                 if len(parts) == 3 and parts[0] == "question" and parts[2] == "reply":
                     request_id = parts[1]
-                    try:
-                        body = _read_json(self)
-                    except ValueError:
-                        _write_json(self, 413, {"error": "payload_too_large"})
+                    body = _read_json_or_write_error(self)
+                    if body is None:
                         return
                     answers = body.get("answers")
                     if isinstance(answers, str):
@@ -852,11 +865,8 @@ class OpenAgenticHttpServer:
                     _write_json(self, 200, True)
                     return
                 if parts == ["session"]:
-                    body: dict[str, Any] = {}
-                    try:
-                        body = _read_json(self)
-                    except ValueError:
-                        _write_json(self, 413, {"error": "payload_too_large"})
+                    body = _read_json_or_write_error(self)
+                    if body is None:
                         return
                     md_raw = body.get("metadata")
                     md: dict[str, Any] = {}
@@ -878,10 +888,8 @@ class OpenAgenticHttpServer:
                     except ValueError:
                         _write_json(self, 400, {"error": "invalid_session_id"})
                         return
-                    try:
-                        body = _read_json(self)
-                    except ValueError:
-                        _write_json(self, 413, {"error": "payload_too_large"})
+                    body = _read_json_or_write_error(self)
+                    if body is None:
                         return
                     prompt = body.get("prompt") or body.get("content") or body.get("text")
                     if not isinstance(prompt, str) or not prompt:
@@ -939,10 +947,8 @@ class OpenAgenticHttpServer:
                         if sid in running_abort:
                             _write_json(self, 409, {"error": "busy"})
                             return
-                    try:
-                        body = _read_json(self)
-                    except ValueError:
-                        _write_json(self, 413, {"error": "payload_too_large"})
+                    body = _read_json_or_write_error(self)
+                    if body is None:
                         return
 
                     head_seq: int | None = None
@@ -973,10 +979,8 @@ class OpenAgenticHttpServer:
                     except ValueError:
                         _write_json(self, 400, {"error": "invalid_session_id"})
                         return
-                    try:
-                        body = _read_json(self)
-                    except ValueError:
-                        _write_json(self, 413, {"error": "payload_too_large"})
+                    body = _read_json_or_write_error(self)
+                    if body is None:
                         return
                     prompt = body.get("prompt") or body.get("content") or body.get("text")
                     if not isinstance(prompt, str) or not prompt:
@@ -1009,10 +1013,8 @@ class OpenAgenticHttpServer:
                     except ValueError:
                         _write_json(self, 400, {"error": "invalid_session_id"})
                         return
-                    try:
-                        body = _read_json(self)
-                    except ValueError:
-                        _write_json(self, 413, {"error": "payload_too_large"})
+                    body = _read_json_or_write_error(self)
+                    if body is None:
                         return
 
                     head_seq = body.get("head_seq")
@@ -1069,10 +1071,8 @@ class OpenAgenticHttpServer:
                 parts, _query = _parse_request_target(self.path)
                 if len(parts) == 2 and parts[0] == "session":
                     sid = parts[1]
-                    try:
-                        body = _read_json(self)
-                    except ValueError:
-                        _write_json(self, 413, {"error": "payload_too_large"})
+                    body = _read_json_or_write_error(self)
+                    if body is None:
                         return
                     patch: dict[str, Any] = {}
                     title = body.get("title")

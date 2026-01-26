@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ipaddress
+import socket
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -10,6 +11,8 @@ from typing import Any, Callable, Mapping
 from .base import Tool, ToolContext
 
 FetchTransport = Callable[[str, Mapping[str, str]], tuple[int, Mapping[str, str], bytes]]
+
+_getaddrinfo = socket.getaddrinfo
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -50,6 +53,22 @@ def _is_blocked_host(host: str) -> bool:
     try:
         ip = ipaddress.ip_address(host)
     except ValueError:
+        try:
+            infos = _getaddrinfo(host, 0)
+        except Exception:  # noqa: BLE001
+            return False
+        for _family, _socktype, _proto, _canonname, sockaddr in infos:
+            ip_str = None
+            if isinstance(sockaddr, tuple) and sockaddr:
+                ip_str = sockaddr[0]
+            if not isinstance(ip_str, str) or not ip_str:
+                continue
+            try:
+                ip2 = ipaddress.ip_address(ip_str)
+            except ValueError:
+                continue
+            if ip2.is_private or ip2.is_loopback or ip2.is_link_local:
+                return True
         return False
     return ip.is_private or ip.is_loopback or ip.is_link_local
 

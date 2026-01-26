@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -18,6 +19,16 @@ from .paths import events_path, meta_path, session_dir, transcript_path
 class FileSessionStore:
     root_dir: Path
     _seq: dict[str, int] = field(default_factory=dict, init=False, repr=False, compare=False)
+    _locks: dict[str, threading.Lock] = field(default_factory=dict, init=False, repr=False, compare=False)
+    _locks_guard: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False, compare=False)
+
+    def _session_lock(self, session_id: str) -> threading.Lock:
+        with self._locks_guard:
+            lock = self._locks.get(session_id)
+            if lock is None:
+                lock = threading.Lock()
+                self._locks[session_id] = lock
+            return lock
 
     def create_session(self, *, metadata: Optional[dict[str, Any]] = None) -> str:
         session_id = uuid.uuid4().hex
@@ -134,38 +145,39 @@ class FileSessionStore:
     def append_event(self, session_id: str, event: Event) -> None:
         # Validate session id before path usage.
         _ = self.session_dir(session_id)
-        path = events_path(self.root_dir, session_id)
-        path.parent.mkdir(parents=True, exist_ok=True)
+        with self._session_lock(session_id):
+            path = events_path(self.root_dir, session_id)
+            path.parent.mkdir(parents=True, exist_ok=True)
 
-        seq = self._seq.get(session_id)
-        if seq is None:
-            seq = self._infer_next_seq(session_id)
-        seq += 1
-        self._seq[session_id] = seq
+            seq = self._seq.get(session_id)
+            if seq is None:
+                seq = self._infer_next_seq(session_id)
+            seq += 1
+            self._seq[session_id] = seq
 
-        obj = event_to_dict(event)
-        obj["seq"] = seq
-        obj["ts"] = time.time()
+            obj = event_to_dict(event)
+            obj["seq"] = seq
+            obj["ts"] = time.time()
 
-        with path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(obj, ensure_ascii=False, separators=(",", ":")))
-            f.write("\n")
+            with path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(obj, ensure_ascii=False, separators=(",", ":")))
+                f.write("\n")
 
-        # Best-effort transcript for UI and diffing. This intentionally excludes
-        # tool inputs/outputs to reduce accidental leakage.
-        et = obj.get("type")
-        if et in ("user.message", "assistant.message"):
-            role = "user" if et == "user.message" else "assistant"
-            entry = {
-                "seq": seq,
-                "ts": obj.get("ts"),
-                "role": role,
-                "text": obj.get("text") if isinstance(obj.get("text"), str) else "",
-            }
-            tp = transcript_path(self.root_dir, session_id)
-            with tp.open("a", encoding="utf-8") as tf:
-                tf.write(json.dumps(entry, ensure_ascii=False, separators=(",", ":")))
-                tf.write("\n")
+            # Best-effort transcript for UI and diffing. This intentionally excludes
+            # tool inputs/outputs to reduce accidental leakage.
+            et = obj.get("type")
+            if et in ("user.message", "assistant.message"):
+                role = "user" if et == "user.message" else "assistant"
+                entry = {
+                    "seq": seq,
+                    "ts": obj.get("ts"),
+                    "role": role,
+                    "text": obj.get("text") if isinstance(obj.get("text"), str) else "",
+                }
+                tp = transcript_path(self.root_dir, session_id)
+                with tp.open("a", encoding="utf-8") as tf:
+                    tf.write(json.dumps(entry, ensure_ascii=False, separators=(",", ":")))
+                    tf.write("\n")
 
     def read_events(self, session_id: str) -> list[Event]:
         try:

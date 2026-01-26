@@ -73,6 +73,7 @@ class SseMcpClient:
 
     _next_id: int = 1
     _pending: dict[int, asyncio.Future[Mapping[str, Any]]] = field(default_factory=dict)
+    _pending_lock: threading.Lock = field(default_factory=threading.Lock)
     _started: bool = False
     _loop: asyncio.AbstractEventLoop | None = None
     _thread: threading.Thread | None = None
@@ -93,7 +94,8 @@ class SseMcpClient:
         rid = msg.get("id")
         if not isinstance(rid, int):
             return
-        fut = self._pending.pop(rid, None)
+        with self._pending_lock:
+            fut = self._pending.pop(rid, None)
         if fut is not None and not fut.done():
             fut.set_result(dict(msg))
 
@@ -133,11 +135,14 @@ class SseMcpClient:
                     buf.append(line[len("data:") :].lstrip())
         except Exception as e:  # noqa: BLE001
             # Fail all pending requests.
-            if self._loop is not None:
-                for rid, fut in list(self._pending.items()):
-                    if not fut.done():
-                        self._loop.call_soon_threadsafe(fut.set_exception, e)
+            loop = self._loop
+            with self._pending_lock:
+                pending_items = list(self._pending.items())
                 self._pending.clear()
+            if loop is not None:
+                for _rid, fut in pending_items:
+                    if not fut.done():
+                        loop.call_soon_threadsafe(fut.set_exception, e)
         finally:
             try:
                 if self._resp is not None:
@@ -187,7 +192,8 @@ class SseMcpClient:
         rid = self._next_id
         self._next_id += 1
         fut: asyncio.Future[Mapping[str, Any]] = asyncio.get_running_loop().create_future()
-        self._pending[rid] = fut
+        with self._pending_lock:
+            self._pending[rid] = fut
 
         payload: dict[str, Any] = {"jsonrpc": "2.0", "id": rid, "method": method}
         if params is not None:
