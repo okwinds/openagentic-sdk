@@ -5,6 +5,10 @@ import argparse
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="oa")
+    # OpenCode VSCode extension parity: it invokes `opencode --port <n>`.
+    # We support `oa --port <n>` as an alias of `oa serve --port <n>`.
+    parser.add_argument("--host", default=None, help="Bind host (alias for `oa serve --host`; used when no subcommand)")
+    parser.add_argument("--port", default=None, type=int, help="Bind port (alias for `oa serve --port`; used when no subcommand)")
     sub = parser.add_subparsers(dest="command")
 
     p_chat = sub.add_parser("chat", help="Start a multi-turn chat REPL")
@@ -76,6 +80,31 @@ def build_parser() -> argparse.ArgumentParser:
     p_serve = sub.add_parser("serve", help="Run the local OpenAgentic HTTP server")
     p_serve.add_argument("--host", default="127.0.0.1", help="Bind host (default: 127.0.0.1)")
     p_serve.add_argument("--port", default=4096, type=int, help="Bind port (default: 4096)")
+
+    _ = sub.add_parser("acp", help="Run an ACP (Agent Client Protocol) stdio server")
+
+    p_gh = sub.add_parser("github", help="GitHub Actions integration")
+    gh_sub = p_gh.add_subparsers(dest="github_command")
+
+    p_gh_install = gh_sub.add_parser("install", help="Generate a GitHub Actions workflow")
+    p_gh_install.add_argument(
+        "--path",
+        default=None,
+        help="Workflow file path (default: .github/workflows/openagentic.yml)",
+    )
+    p_gh_install.add_argument("--force", action="store_true", help="Overwrite existing workflow file")
+
+    p_gh_run = gh_sub.add_parser("run", help="Run as a GitHub Actions worker")
+    p_gh_run.add_argument("--event-path", default=None, help="Path to GitHub event JSON (default: $GITHUB_EVENT_PATH)")
+    p_gh_run.add_argument("--print-prompt", action="store_true", help="Print derived prompt and exit")
+    p_gh_run.add_argument("--reply-text", default=None, help="Use this reply text instead of calling the agent")
+    p_gh_run.add_argument("--base-url", default=None, help="GitHub API base URL (default: $GITHUB_API_URL or https://api.github.com)")
+    p_gh_run.add_argument("--token", default=None, help="GitHub token (default: $GITHUB_TOKEN)")
+    p_gh_run.add_argument(
+        "--mentions",
+        default=None,
+        help="Comma-separated mention triggers (default: $MENTIONS or '/opencode,/oc')",
+    )
 
     return parser
 

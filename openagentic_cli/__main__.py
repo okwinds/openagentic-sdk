@@ -27,15 +27,30 @@ def default_permission_mode() -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     ns = parser.parse_args(argv)
-    if getattr(ns, "command", None) is None:
-        parser.print_help()
-        return 0
 
     cwd = os.getcwd()
     project_dir = cwd
     permission_mode = default_permission_mode()
     interactive = bool(getattr(sys.stdin, "isatty", lambda: False)())
     style = StyleConfig(color="auto")
+
+    if getattr(ns, "command", None) is None:
+        # OpenCode parity: `opencode --port <n>` starts the local server. We
+        # accept `oa --port <n>` as an alias of `oa serve --port <n>`.
+        port0 = getattr(ns, "port", None)
+        if isinstance(port0, int) and port0 > 0:
+            host0 = str(getattr(ns, "host", "127.0.0.1") or "127.0.0.1")
+            opts = build_options(
+                cwd=cwd,
+                project_dir=project_dir,
+                permission_mode=permission_mode,
+                interactive=interactive,
+            )
+            serve_http(options=opts, host=host0, port=int(port0))
+            return 0
+
+        parser.print_help()
+        return 0
 
     if ns.command in ("chat", "resume"):
         session_id = getattr(ns, "session_id", None)
@@ -157,6 +172,54 @@ def main(argv: list[str] | None = None) -> int:
         )
         serve_http(options=opts, host=host, port=port)
         return 0
+
+    if ns.command == "acp":
+        from openagentic_sdk.integrations.acp_stdio import serve_acp_stdio
+
+        opts = build_options(
+            cwd=cwd,
+            project_dir=project_dir,
+            permission_mode=permission_mode,
+            interactive=False,
+        )
+        asyncio.run(serve_acp_stdio(opts))
+        return 0
+
+    if ns.command == "github":
+        sub = getattr(ns, "github_command", None)
+        if sub == "install":
+            from .github_cmd import cmd_github_install
+
+            path = getattr(ns, "path", None)
+            force = bool(getattr(ns, "force", False))
+            out = cmd_github_install(workflow_path=str(path) if isinstance(path, str) and path else None, force=force)
+            sys.stdout.write(out + "\n")
+            sys.stdout.flush()
+            return 0
+        if sub == "run":
+            from .github_cmd import cmd_github_run
+
+            event_path = getattr(ns, "event_path", None)
+            print_prompt = bool(getattr(ns, "print_prompt", False))
+            reply_text = getattr(ns, "reply_text", None)
+            base_url = getattr(ns, "base_url", None)
+            token = getattr(ns, "token", None)
+            mentions = getattr(ns, "mentions", None)
+            if isinstance(reply_text, str) and reply_text.strip():
+                os.environ["OA_GITHUB_REPLY_TEXT"] = reply_text.strip()
+            if isinstance(base_url, str) and base_url.strip():
+                os.environ["GITHUB_API_URL"] = base_url.strip()
+            if isinstance(token, str) and token.strip():
+                os.environ["GITHUB_TOKEN"] = token.strip()
+            if isinstance(mentions, str) and mentions.strip():
+                os.environ["MENTIONS"] = mentions.strip()
+
+            out = cmd_github_run(event_path=str(event_path) if isinstance(event_path, str) and event_path else None, print_prompt=print_prompt)
+            sys.stdout.write(out + "\n")
+            sys.stdout.flush()
+            return 0
+        parser.error("missing or unknown github subcommand")
+        return 2
 
     parser.error(f"command not implemented: {ns.command}")
     return 2
