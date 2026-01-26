@@ -1,9 +1,11 @@
 import asyncio
+import gc
 import json
 import os
 import threading
 import time
 import unittest
+import warnings
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -117,8 +119,26 @@ class TestMcpOauthRefresh(unittest.IsolatedAsyncioTestCase):
                     async def open_url(_url: str) -> None:
                         raise AssertionError("should not open browser")
 
-                    tok = await mgr.authenticate(server_key="srv", server_url=srv.base_url + "/mcp", scope=None, open_url=open_url)
-                    self.assertEqual(tok, "tok2")
+                    with warnings.catch_warnings(record=True) as caught:
+                        warnings.simplefilter("always", ResourceWarning)
+                        tok = await mgr.authenticate(
+                            server_key="srv",
+                            server_url=srv.base_url + "/mcp",
+                            scope=None,
+                            open_url=open_url,
+                        )
+                        self.assertEqual(tok, "tok2")
+
+                        await asyncio.get_running_loop().shutdown_default_executor()
+                        gc.collect()
+                        gc.collect()
+
+                    resource_warnings = [w for w in caught if issubclass(w.category, ResourceWarning)]
+                    self.assertEqual(
+                        resource_warnings,
+                        [],
+                        "unexpected ResourceWarning(s): " + ", ".join(str(w.message) for w in resource_warnings),
+                    )
                 finally:
                     os.environ.pop("OPENAGENTIC_SDK_HOME", None)
         finally:

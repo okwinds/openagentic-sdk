@@ -3,12 +3,13 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import http.client
+import io
 import json
 import os
 import time
 import urllib.error
 import urllib.parse
-import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Mapping
@@ -53,9 +54,13 @@ def _scope_includes(stored: str | None, required: str | None) -> bool:
 
 
 def _http_get_json(url: str, *, timeout_s: float = 5.0) -> Mapping[str, Any]:
-    req = urllib.request.Request(url, method="GET", headers={"Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=float(timeout_s)) as resp:  # noqa: S310
-        raw = resp.read()
+    raw = _http_request_raw(
+        url,
+        method="GET",
+        headers={"Accept": "application/json"},
+        timeout_s=timeout_s,
+        allow_redirects=True,
+    )
     obj = json.loads(raw.decode("utf-8", errors="replace"))
     if not isinstance(obj, dict):
         raise ValueError("expected JSON object")
@@ -64,11 +69,14 @@ def _http_get_json(url: str, *, timeout_s: float = 5.0) -> Mapping[str, Any]:
 
 def _http_post_json(url: str, payload: Mapping[str, Any], *, timeout_s: float = 10.0) -> Mapping[str, Any]:
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    req = urllib.request.Request(url, data=data, method="POST")
-    req.add_header("Content-Type", "application/json")
-    req.add_header("Accept", "application/json")
-    with urllib.request.urlopen(req, timeout=float(timeout_s)) as resp:  # noqa: S310
-        raw = resp.read()
+    raw = _http_request_raw(
+        url,
+        method="POST",
+        headers={"Accept": "application/json", "Content-Type": "application/json"},
+        body=data,
+        timeout_s=timeout_s,
+        allow_redirects=False,
+    )
     obj = json.loads(raw.decode("utf-8", errors="replace"))
     if not isinstance(obj, dict):
         raise ValueError("expected JSON object")
@@ -77,15 +85,68 @@ def _http_post_json(url: str, payload: Mapping[str, Any], *, timeout_s: float = 
 
 def _http_post_form(url: str, params: Mapping[str, str], *, timeout_s: float = 10.0) -> Mapping[str, Any]:
     body = urllib.parse.urlencode(dict(params)).encode("utf-8")
-    req = urllib.request.Request(url, data=body, method="POST")
-    req.add_header("Content-Type", "application/x-www-form-urlencoded")
-    req.add_header("Accept", "application/json")
-    with urllib.request.urlopen(req, timeout=float(timeout_s)) as resp:  # noqa: S310
-        raw = resp.read()
+    raw = _http_request_raw(
+        url,
+        method="POST",
+        headers={"Accept": "application/json", "Content-Type": "application/x-www-form-urlencoded"},
+        body=body,
+        timeout_s=timeout_s,
+        allow_redirects=False,
+    )
     obj = json.loads(raw.decode("utf-8", errors="replace"))
     if not isinstance(obj, dict):
         raise ValueError("expected JSON object")
     return obj
+
+
+def _http_request_raw(
+    url: str,
+    *,
+    method: str,
+    headers: Mapping[str, str],
+    body: bytes | None = None,
+    timeout_s: float,
+    allow_redirects: bool,
+    max_redirects: int = 5,
+) -> bytes:
+    current_url = url
+    redirects_left = max_redirects
+
+    while True:
+        parts = urllib.parse.urlsplit(current_url)
+        if parts.scheme not in ("http", "https"):
+            raise ValueError(f"unsupported URL scheme: {parts.scheme}")
+        if not parts.hostname:
+            raise ValueError("URL missing hostname")
+
+        port = parts.port or (443 if parts.scheme == "https" else 80)
+        target = parts.path or "/"
+        if parts.query:
+            target += "?" + parts.query
+
+        conn_cls = http.client.HTTPSConnection if parts.scheme == "https" else http.client.HTTPConnection
+        conn = conn_cls(parts.hostname, port, timeout=float(timeout_s))
+        try:
+            conn.request(method, target, body=body, headers=dict(headers))
+            resp = conn.getresponse()
+            raw = resp.read()
+
+            if allow_redirects and method == "GET" and resp.status in (301, 302, 303, 307, 308):
+                loc = resp.getheader("Location")
+                if not loc:
+                    raise urllib.error.HTTPError(current_url, resp.status, resp.reason, resp.headers, io.BytesIO(raw))
+                if redirects_left <= 0:
+                    raise RuntimeError(f"too many redirects while fetching {url!r}")
+                current_url = urllib.parse.urljoin(current_url, loc)
+                redirects_left -= 1
+                continue
+
+            if resp.status >= 400:
+                raise urllib.error.HTTPError(current_url, resp.status, resp.reason, resp.headers, io.BytesIO(raw))
+
+            return raw
+        finally:
+            conn.close()
 
 
 def _first_json(urls: list[str], *, timeout_s: float = 5.0) -> Mapping[str, Any]:
@@ -103,8 +164,8 @@ def _first_json(urls: list[str], *, timeout_s: float = 5.0) -> Mapping[str, Any]
 class McpOAuthManager:
     """MCP OAuth manager (authorization-code + PKCE + DCR).
 
-    This is intentionally standalone (urllib + local callback server) so it can
-    run without extra dependencies.
+    This is intentionally standalone (stdlib HTTP + local callback server) so it
+    can run without extra dependencies.
     """
 
     home: str | None = None
