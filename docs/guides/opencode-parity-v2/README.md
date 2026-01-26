@@ -21,7 +21,7 @@ Audience:
 
   `oa resume <session_id>`
 
-## Guides (v2-01 .. v2-10)
+## Guides (v2-01 .. v2-11)
 
 - `docs/guides/opencode-parity-v2/01-prompt-system.md`
 - `docs/guides/opencode-parity-v2/02-config.md`
@@ -33,6 +33,7 @@ Audience:
 - `docs/guides/opencode-parity-v2/08-providers-and-models.md`
 - `docs/guides/opencode-parity-v2/09-lsp.md`
 - `docs/guides/opencode-parity-v2/10-sessions.md`
+- `docs/guides/opencode-parity-v2/11-integrations.md`
 
 ## Conventions
 

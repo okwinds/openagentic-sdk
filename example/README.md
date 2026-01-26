@@ -97,3 +97,8 @@ Hooks / restrictions / MCP pipelines:
 - `example/37_allowed_tools_sandbox_demo.py` — `allowed_tools` denial + recovery
 - `example/38_mcp_two_tools_pipeline.py` — compose two MCP SDK tools
 - `example/39_multi_turn_client_workflow.py` — multi-turn `OpenAgentSDKClient` + `TodoWrite`
+
+Integrations / end-to-end:
+- `example/54_vscode_server_compat_smoke.py` — start local server and hit `/app` + `/tui/append-prompt`
+- `example/55_acp_stdio_client_roundtrip.py` — run `oa acp` and speak ACP NDJSON as a tiny client
+- `example/56_github_run_local_simulation.py` — run `oa github run` against a local mock GitHub API

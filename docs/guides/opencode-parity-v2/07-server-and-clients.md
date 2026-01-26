@@ -10,6 +10,14 @@ Run the server:
 oa serve --host 127.0.0.1 --port 4096
 ```
 
+OpenCode VSCode extension parity (alias):
+
+```
+oa --port 4096
+```
+
+This is equivalent to `oa serve --port 4096`.
+
 Defaults:
 
 - host: `127.0.0.1`
@@ -48,6 +56,14 @@ Health:
 
 - `GET /global/health`
 - `GET /health` (legacy)
+
+VSCode extension compatibility:
+
+- `GET /app`
+  - returns a minimal HTML page
+- `POST /tui/append-prompt` with JSON `{"text":"..."}`
+  - appends a prompt into an active session and starts execution asynchronously
+  - returns `{"ok":true,"session_id":"..."}`
 
 Event streaming (SSE):
 
