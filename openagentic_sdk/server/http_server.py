@@ -120,6 +120,15 @@ def _write_json(handler: BaseHTTPRequestHandler, status: int, obj: Any) -> None:
     handler.wfile.write(raw)
 
 
+def _write_text(handler: BaseHTTPRequestHandler, status: int, text: str, *, content_type: str = "text/plain; charset=utf-8") -> None:
+    raw = (text or "").encode("utf-8")
+    handler.send_response(status)
+    handler.send_header("Content-Type", content_type)
+    handler.send_header("Content-Length", str(len(raw)))
+    handler.end_headers()
+    handler.wfile.write(raw)
+
+
 def _session_info(store: FileSessionStore, session_id: str) -> dict[str, Any] | None:
     try:
         _ = store.session_dir(session_id)
@@ -196,6 +205,10 @@ class OpenAgenticHttpServer:
         running_abort: dict[str, threading.Event] = {}
         running_lock = threading.Lock()
 
+        # VSCode extension parity endpoints use a "current" session.
+        tui_active_session_id: str | None = None
+        tui_lock = threading.Lock()
+
         # Permission / Question queues (OpenCode parity endpoints).
         pending_permissions: dict[str, dict[str, Any]] = {}
         permission_answers: dict[str, queue.Queue[str]] = {}
@@ -257,6 +270,30 @@ class OpenAgenticHttpServer:
                 user_answerer=_user_answerer,
             )
 
+        def _start_prompt_async(*, sid: str, prompt: str) -> None:
+            # Shared helper for /session/{id}/prompt_async and /tui/append-prompt.
+            abort_ev = threading.Event()
+            with running_lock:
+                running_abort[sid] = abort_ev
+
+            def _bg() -> None:
+                try:
+                    async def _run_bg() -> None:
+                        from ..api import query as query_events
+
+                        gate2 = _make_permission_gate_for_server()
+                        opts2 = replace(opts, resume=sid, session_store=store, abort_event=abort_ev, permission_gate=gate2)
+                        async for ev in query_events(prompt=prompt, options=opts2):
+                            d = event_to_dict(ev)
+                            hub.publish({"type": "session.event", "session_id": sid, "event": d})
+
+                    asyncio.run(_run_bg())
+                finally:
+                    with running_lock:
+                        running_abort.pop(sid, None)
+
+            threading.Thread(target=_bg, name=f"oa-session-{sid}", daemon=True).start()
+
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self):  # noqa: N802
                 if not _authorized(self):
@@ -273,6 +310,28 @@ class OpenAgenticHttpServer:
                 # OpenCode parity.
                 if parts == ["global", "health"]:
                     _write_json(self, 200, {"healthy": True, "version": "openagentic-sdk"})
+                    return
+
+                if parts == ["app"]:
+                    # OpenCode parity: VSCode extension probes this route.
+                    _write_text(
+                        self,
+                        200,
+                        """<!doctype html>
+<html lang=\"en\">
+  <head>
+    <meta charset=\"utf-8\" />
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
+    <title>openagentic-sdk</title>
+  </head>
+  <body>
+    <h1>openagentic-sdk</h1>
+    <p>This is a minimal compatibility endpoint for the OpenCode VSCode extension.</p>
+  </body>
+</html>
+""",
+                        content_type="text/html; charset=utf-8",
+                    )
                     return
 
                 if parts == ["path"]:
@@ -298,11 +357,13 @@ class OpenAgenticHttpServer:
                         {
                             "openapi": "3.1.1",
                             "info": {"title": "openagentic-sdk", "version": "0.1.1"},
-                            "paths": {
-                                "/global/health": {"get": {}},
-                                "/global/event": {"get": {}},
-                                "/event": {"get": {}},
-                                "/provider": {"get": {}},
+                             "paths": {
+                                 "/global/health": {"get": {}},
+                                 "/app": {"get": {}},
+                                 "/global/event": {"get": {}},
+                                 "/event": {"get": {}},
+                                 "/tui/append-prompt": {"post": {}},
+                                 "/provider": {"get": {}},
                                 "/provider/auth": {"get": {}},
                                 "/provider/{providerID}/oauth/authorize": {"post": {}},
                                 "/provider/{providerID}/oauth/callback": {"post": {}},
@@ -692,6 +753,7 @@ class OpenAgenticHttpServer:
                 _write_json(self, 404, {"error": "not_found"})
 
             def do_POST(self):  # noqa: N802
+                nonlocal tui_active_session_id
                 if not _authorized(self):
                     _write_json(self, 401, {"error": "unauthorized"})
                     return
@@ -702,6 +764,40 @@ class OpenAgenticHttpServer:
                 # provider OAuth manager is implemented).
                 if len(parts) == 4 and parts[0] == "provider" and parts[2] == "oauth" and parts[3] in ("authorize", "callback"):
                     _write_json(self, 400, {"error": "unsupported"})
+                    return
+
+                # OpenCode parity: VSCode extension "append prompt" bridge.
+                if parts == ["tui", "append-prompt"]:
+                    try:
+                        body = _read_json(self)
+                    except ValueError:
+                        _write_json(self, 413, {"error": "payload_too_large"})
+                        return
+                    prompt = body.get("text") or body.get("prompt") or body.get("content")
+                    if not isinstance(prompt, str) or not prompt:
+                        _write_json(self, 400, {"error": "invalid_prompt"})
+                        return
+
+                    sid_raw = body.get("session_id") or body.get("sessionId")
+                    sid: str | None = str(sid_raw) if isinstance(sid_raw, str) and sid_raw else None
+                    if sid is not None:
+                        try:
+                            _ = store.session_dir(sid)
+                        except ValueError:
+                            _write_json(self, 400, {"error": "invalid_session_id"})
+                            return
+                    else:
+                        with tui_lock:
+                            sid = tui_active_session_id
+                        if sid is not None and store.read_meta_record(sid):
+                            pass
+                        else:
+                            sid = store.create_session(metadata={"title": "VSCode"})
+                            with tui_lock:
+                                tui_active_session_id = sid
+
+                    _start_prompt_async(sid=sid, prompt=prompt)
+                    _write_json(self, 200, {"ok": True, "session_id": sid})
                     return
 
                 # OpenCode parity: permission and question queues.
@@ -887,27 +983,7 @@ class OpenAgenticHttpServer:
                         _write_json(self, 400, {"error": "invalid_prompt"})
                         return
 
-                    abort_ev = threading.Event()
-                    with running_lock:
-                        running_abort[sid] = abort_ev
-
-                    def _bg() -> None:
-                        try:
-                            async def _run_bg() -> None:
-                                from ..api import query as query_events
-
-                                gate2 = _make_permission_gate_for_server()
-                                opts2 = replace(opts, resume=sid, session_store=store, abort_event=abort_ev, permission_gate=gate2)
-                                async for ev in query_events(prompt=prompt, options=opts2):
-                                    d = event_to_dict(ev)
-                                    hub.publish({"type": "session.event", "session_id": sid, "event": d})
-
-                            asyncio.run(_run_bg())
-                        finally:
-                            with running_lock:
-                                running_abort.pop(sid, None)
-
-                    threading.Thread(target=_bg, name=f"oa-session-{sid}", daemon=True).start()
+                    _start_prompt_async(sid=sid, prompt=prompt)
                     self.send_response(204)
                     self.end_headers()
                     return
