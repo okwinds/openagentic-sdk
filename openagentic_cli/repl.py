@@ -118,6 +118,40 @@ def _enable_windows_vt_input(stdin: TextIO) -> Callable[[], None] | None:
         return None
 
 
+def _disable_posix_echoctl(stdin: TextIO) -> Callable[[], None] | None:
+    """Best-effort: disable ECHOCTL so bracketed paste markers don't render as `^[[200~`."""
+
+    if os.name == "nt":
+        return None
+    if not bool(getattr(stdin, "isatty", lambda: False)()):
+        return None
+    try:
+        import termios  # noqa: PLC0415
+
+        echoctl = getattr(termios, "ECHOCTL", None)
+        if echoctl is None:
+            return None
+        fd = stdin.fileno()
+        old_attrs = termios.tcgetattr(fd)
+        old_lflag = int(old_attrs[3])
+        if not (old_lflag & echoctl):
+            return None
+
+        new_attrs = list(old_attrs)
+        new_attrs[3] = old_lflag & ~echoctl
+        termios.tcsetattr(fd, termios.TCSADRAIN, new_attrs)
+
+        def _restore() -> None:
+            try:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_attrs)
+            except Exception:  # noqa: BLE001
+                pass
+
+        return _restore
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def read_repl_turn(stdin: TextIO, *, paste_mode: bool = False) -> ReplTurn | None:
     """Read one user 'turn' from stdin.
 
@@ -217,6 +251,7 @@ async def run_chat(
     show_thinking_hint = os.getenv("OA_SHOW_THINKING", "1").strip().lower() not in ("0", "false", "no", "off")
     is_tty = bool(getattr(stdout, "isatty", lambda: False)())
     trace_enabled = os.getenv("OA_TRACE", "1").strip().lower() not in ("0", "false", "no", "off")
+    bracketed_paste_enabled = os.getenv("OA_BRACKETED_PASTE", "1").strip().lower() not in ("0", "false", "no", "off")
 
     render_stream = StylizingStream(stdout, highlighter=InlineCodeHighlighter(enabled=enable_color)) if enable_color else stdout
     renderer = TraceRenderer(stream=render_stream, color=enable_color, show_hooks=debug) if trace_enabled else TraceRenderer(stream=render_stream, color=False, show_hooks=debug)
@@ -252,15 +287,20 @@ async def run_chat(
     session_id = opts.resume
     current_abort_event: asyncio.Event | None = None
 
-    enable_bracketed_paste = bool(is_tty and stdin_is_tty)
+    enable_bracketed_paste = bool(bracketed_paste_enabled and is_tty and stdin_is_tty)
     restore_vt: Callable[[], None] | None = None
+    restore_echoctl: Callable[[], None] | None = None
     if enable_bracketed_paste:
         try:
+            restore_echoctl = _disable_posix_echoctl(stdin)
             restore_vt = _enable_windows_vt_input(stdin)
             stdout.write(_BP_ENABLE)
             stdout.flush()
         except Exception:
             enable_bracketed_paste = False
+            if restore_echoctl is not None:
+                restore_echoctl()
+                restore_echoctl = None
             if restore_vt is not None:
                 restore_vt()
                 restore_vt = None
@@ -425,5 +465,7 @@ async def run_chat(
                 stdout.flush()
             except Exception:
                 pass
+        if restore_echoctl is not None:
+            restore_echoctl()
         if restore_vt is not None:
             restore_vt()

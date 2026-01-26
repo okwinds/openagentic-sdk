@@ -13,6 +13,10 @@ Everything between the markers (including internal newlines) becomes one prompt.
 
 Important: pasted content is treated as literal prompt text, not as a REPL command (so pasting `/exit` won’t exit).
 
+Note: `oa chat` also disables POSIX `ECHOCTL` while it runs so these control sequences typically won’t be visibly echoed as `^[[200~` / `^[[201~`.
+
+If you still see markers in your terminal, you can disable bracketed paste mode with `OA_BRACKETED_PASTE=0` and use `/paste`…`/end` as the deterministic multi-line fallback.
+
 ### Windows / PowerShell note
 
 On Windows consoles, receiving bracketed paste markers requires enabling “virtual terminal input” mode on stdin. `oa chat` enables this automatically while it runs.

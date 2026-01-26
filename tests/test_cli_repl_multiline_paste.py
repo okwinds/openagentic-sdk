@@ -1,6 +1,7 @@
 import io
 import os
 import unittest
+from unittest import mock
 
 
 class TestCliReplMultilinePaste(unittest.TestCase):
@@ -115,6 +116,87 @@ class TestCliReplMultilinePaste(unittest.TestCase):
                 os.close(rfd)
             except OSError:
                 pass
+
+    def test_disable_posix_echoctl_helper_exists(self) -> None:
+        import openagentic_cli.repl as repl
+
+        self.assertTrue(hasattr(repl, "_disable_posix_echoctl"))
+
+    def test_disable_posix_echoctl_clears_echoctl_and_restores(self) -> None:
+        import openagentic_cli.repl as repl
+        import termios
+
+        if not hasattr(repl, "_disable_posix_echoctl"):
+            self.fail("missing _disable_posix_echoctl")
+
+        class _FakeStdin:
+            def isatty(self) -> bool:  # pragma: no cover
+                return True
+
+            def fileno(self) -> int:  # pragma: no cover
+                return 123
+
+        attrs = [0, 0, 0, termios.ECHOCTL | termios.ECHO, 0, 0, []]
+        with mock.patch("termios.tcgetattr", return_value=list(attrs)) as tcgetattr:
+            with mock.patch("termios.tcsetattr") as tcsetattr:
+                restore = repl._disable_posix_echoctl(_FakeStdin())  # type: ignore[attr-defined]
+                self.assertIsNotNone(restore)
+                tcgetattr.assert_called_once()
+                self.assertGreaterEqual(tcsetattr.call_count, 1)
+                set_args, _set_kwargs = tcsetattr.call_args
+                self.assertEqual(set_args[0], 123)
+                new_attrs = set_args[2]
+                self.assertFalse(bool(new_attrs[3] & termios.ECHOCTL))
+
+                assert restore is not None
+                restore()
+                self.assertEqual(tcsetattr.call_count, 2)
+                restore_args, _restore_kwargs = tcsetattr.call_args
+                self.assertEqual(restore_args[0], 123)
+                self.assertEqual(restore_args[2], attrs)
+
+    def test_run_chat_calls_disable_posix_echoctl_when_tty(self) -> None:
+        import asyncio
+
+        import openagentic_cli.repl as repl
+        from openagentic_sdk.options import OpenAgenticOptions
+
+        if not hasattr(repl, "_disable_posix_echoctl"):
+            self.fail("missing _disable_posix_echoctl")
+
+        class _FakeProvider:
+            name = "fake"
+
+            async def complete(self, **_kwargs):  # pragma: no cover
+                raise AssertionError("should not be called")
+
+        class _FakeTty:
+            def __init__(self, lines: list[str]) -> None:
+                self._lines = lines
+                self._writes: list[str] = []
+
+            def isatty(self) -> bool:  # pragma: no cover
+                return True
+
+            def readline(self) -> str:  # pragma: no cover
+                return self._lines.pop(0) if self._lines else ""
+
+            def write(self, s: str) -> int:  # pragma: no cover
+                self._writes.append(s)
+                return len(s)
+
+            def flush(self) -> None:  # pragma: no cover
+                pass
+
+        stdin = _FakeTty(["n\n"])
+        stdout = _FakeTty([])
+        opts = OpenAgenticOptions(provider=_FakeProvider(), model="fake", cwd=os.getcwd())
+
+        restore = mock.Mock()
+        with mock.patch.object(repl, "_disable_posix_echoctl", return_value=restore):  # type: ignore[attr-defined]
+            rc = asyncio.run(repl.run_chat(opts, color_config=repl.StyleConfig(color="never"), debug=False, stdin=stdin, stdout=stdout))
+        self.assertEqual(rc, 0)
+        restore.assert_called_once()
 
 
 if __name__ == "__main__":
