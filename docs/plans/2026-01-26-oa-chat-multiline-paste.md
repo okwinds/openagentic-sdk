@@ -142,3 +142,5 @@ Update user docs to mention:
 - Tests: `tests/test_cli_repl_multiline_paste.py`
 - Guide: `docs/guides/oa-chat-multiline-paste.md`
 - Verification: `python -m unittest -q tests.test_cli_repl_multiline_paste`
+- Fix-up: `/paste` mode strips bracketed paste markers as well.
+- Fix-up: coalesce already-buffered multi-line pastes even when markers are missing (notably PowerShell/Windows).

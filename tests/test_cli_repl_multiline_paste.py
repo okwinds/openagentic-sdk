@@ -1,4 +1,5 @@
 import io
+import os
 import unittest
 
 
@@ -52,6 +53,17 @@ class TestCliReplMultilinePaste(unittest.TestCase):
         self.assertEqual(turn.text, "line1\nline2")
         self.assertTrue(turn.is_paste)
 
+    def test_read_turn_manual_paste_mode_strips_bracketed_paste_markers(self) -> None:
+        from openagentic_cli.repl import read_repl_turn
+
+        s = "\x1b[200~line1\nline2\x1b[201~\n/end\n"
+        turn = read_repl_turn(io.StringIO(s), paste_mode=True)
+        self.assertIsNotNone(turn)
+        assert turn is not None
+        self.assertEqual(turn.text, "line1\nline2")
+        self.assertTrue(turn.is_paste)
+        self.assertTrue(turn.is_manual_paste)
+
     def test_read_turn_manual_paste_mode_end_with_whitespace(self) -> None:
         from openagentic_cli.repl import read_repl_turn
 
@@ -78,6 +90,31 @@ class TestCliReplMultilinePaste(unittest.TestCase):
         self.assertEqual(turn.text, "line1")
         self.assertTrue(turn.is_paste)
         self.assertTrue(turn.is_manual_paste)
+
+    def test_read_turn_tty_buffered_multiline_coalesces_without_markers(self) -> None:
+        from openagentic_cli.repl import read_repl_turn
+
+        rfd, wfd = os.pipe()
+        try:
+            os.write(wfd, b"line1\nline2\nline3\n")
+            os.close(wfd)
+
+            with os.fdopen(rfd, "r", encoding="utf-8") as r:
+                r.isatty = lambda: True  # type: ignore[method-assign]
+                turn = read_repl_turn(r)
+                self.assertIsNotNone(turn)
+                assert turn is not None
+                self.assertEqual(turn.text, "line1\nline2\nline3")
+                self.assertTrue(turn.is_paste)
+        finally:
+            try:
+                os.close(wfd)
+            except OSError:
+                pass
+            try:
+                os.close(rfd)
+            except OSError:
+                pass
 
 
 if __name__ == "__main__":

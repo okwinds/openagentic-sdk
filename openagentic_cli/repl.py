@@ -3,8 +3,10 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import select
 import shutil
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TextIO
@@ -50,6 +52,72 @@ def _strip_bracketed_paste_markers(s: str) -> str:
     return s.replace(_BP_START, "").replace(_BP_END, "")
 
 
+def _stdin_has_buffered_input(stdin: TextIO) -> bool:
+    """Best-effort check for already-buffered stdin input (TTY only).
+
+    Used as a fallback for terminals that don't emit bracketed paste markers:
+    multi-line pastes typically arrive fully buffered, so we can coalesce them
+    into one turn without blocking.
+    """
+
+    if not bool(getattr(stdin, "isatty", lambda: False)()):
+        return False
+    try:
+        fd = stdin.fileno()
+    except Exception:  # noqa: BLE001
+        fd = None
+
+    if fd is not None:
+        try:
+            r, _w, _x = select.select([fd], [], [], 0)
+            return bool(r)
+        except Exception:  # noqa: BLE001
+            return False
+
+    if os.name == "nt":
+        try:
+            import msvcrt  # type: ignore[import-not-found]
+
+            return bool(msvcrt.kbhit())
+        except Exception:  # noqa: BLE001
+            return False
+
+    return False
+
+
+def _enable_windows_vt_input(stdin: TextIO) -> Callable[[], None] | None:
+    """Enable Windows virtual terminal input so bracketed paste markers arrive on stdin."""
+
+    if os.name != "nt":
+        return None
+    try:
+        import ctypes
+        import msvcrt  # type: ignore[import-not-found]
+
+        handle = msvcrt.get_osfhandle(stdin.fileno())
+        mode = ctypes.c_uint32()
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        if not kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+            return None
+        old_mode = int(mode.value)
+        enable_vt = 0x0200  # ENABLE_VIRTUAL_TERMINAL_INPUT
+        new_mode = old_mode | enable_vt
+        if new_mode == old_mode:
+            return lambda: None
+        if not kernel32.SetConsoleMode(handle, new_mode):
+            return None
+
+        def _restore() -> None:
+            try:
+                kernel32.SetConsoleMode(handle, old_mode)
+            except Exception:  # noqa: BLE001
+                pass
+
+        return _restore
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def read_repl_turn(stdin: TextIO, *, paste_mode: bool = False) -> ReplTurn | None:
     """Read one user 'turn' from stdin.
 
@@ -66,9 +134,14 @@ def read_repl_turn(stdin: TextIO, *, paste_mode: bool = False) -> ReplTurn | Non
             line = stdin.readline()
             if line == "":
                 break
-            s = line.rstrip("\r\n")
+            s0 = _strip_bracketed_paste_markers(line)
+            s = s0.rstrip("\r\n")
             if s.strip() == "/end":
                 break
+            # If bracketed paste markers arrive on their own line, ignore them
+            # rather than treating them as an intentional blank line.
+            if s == "" and line.strip() in {_BP_START, _BP_END}:
+                continue
             lines.append(s)
         if not lines and line == "":
             return None
@@ -89,6 +162,14 @@ def read_repl_turn(stdin: TextIO, *, paste_mode: bool = False) -> ReplTurn | Non
         if _BP_END in chunk:
             in_paste = False
         parts.append(_strip_bracketed_paste_markers(chunk))
+
+    if not is_paste and _stdin_has_buffered_input(stdin):
+        is_paste = True
+        while _stdin_has_buffered_input(stdin):
+            chunk = stdin.readline()
+            if chunk == "":
+                break
+            parts.append(chunk)
 
     text = "".join(parts).rstrip("\r\n")
     return ReplTurn(text, is_paste=is_paste)
@@ -172,12 +253,17 @@ async def run_chat(
     current_abort_event: asyncio.Event | None = None
 
     enable_bracketed_paste = bool(is_tty and stdin_is_tty)
+    restore_vt: Callable[[], None] | None = None
     if enable_bracketed_paste:
         try:
+            restore_vt = _enable_windows_vt_input(stdin)
             stdout.write(_BP_ENABLE)
             stdout.flush()
         except Exception:
             enable_bracketed_paste = False
+            if restore_vt is not None:
+                restore_vt()
+                restore_vt = None
 
     _print(stdout, dim("Type /help for commands.", enabled=enable_color))
     try:
@@ -339,3 +425,5 @@ async def run_chat(
                 stdout.flush()
             except Exception:
                 pass
+        if restore_vt is not None:
+            restore_vt()
