@@ -18,6 +18,7 @@ dependencies = []
 
 [project.scripts]
 oa = "openagentic_cli.__main__:main"
+oag = "openagentic_gateway.__main__:main"
 
 [project.optional-dependencies]
 dev = [
@@ -36,7 +37,7 @@ package-dir = {"" = "."}
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["openagentic_sdk*", "openagentic_cli*"]
+include = ["openagentic_sdk*", "openagentic_cli*", "openagentic_gateway*"]
 
 [tool.setuptools.package-data]
 openagentic_sdk = [
