@@ -41,6 +41,19 @@ Notes:
 - `example/05_resume_session.py` — `resume=<session_id>` continues a session
 - `example/bugfix_auth.py` — real tool loop against `example/auth.py` (interactive approvals)
 
+## CAS Scenarios (curated)
+
+These examples mirror the *scenario shape* of `claude-agent-sdk-python/examples/` (quickstart, streaming client, interrupt, permissions callback, hooks, partial messages, SDK MCP tools, subagent task):
+
+- `example/cas_01_quickstart.py`
+- `example/cas_02_client_streaming_and_multiturn.py`
+- `example/cas_03_interrupt.py`
+- `example/cas_04_permissions_callback.py`
+- `example/cas_05_hooks.py`
+- `example/cas_06_include_partial_messages.py`
+- `example/cas_07_sdk_mcp_tools.py`
+- `example/cas_08_task_subagent.py`
+
 ## Tools
 
 - `example/06_tool_read.py` — `Read`
