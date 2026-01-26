@@ -5,31 +5,86 @@ import base64
 import json
 import os
 import queue
+import shutil
+import subprocess
 import threading
 import time
-import subprocess
-import shutil
 from dataclasses import dataclass, replace
-from http.server import BaseHTTPRequestHandler
-from http.server import ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import parse_qs, urlparse
 
-from ..options import OpenAgenticOptions
+from ..auth import OAuthAuth, all_auth
 from ..opencode_config import load_merged_config
+from ..options import OpenAgenticOptions
+from ..providers.catalog import build_provider_listing
 from ..serialization import event_to_dict
 from ..sessions.rebuild import rebuild_messages
 from ..sessions.store import FileSessionStore
 from ..sessions.todos import normalize_todos_for_api
-from .opencode_view import build_message_v2
-from ..share.share import fetch_shared_session, share_session, unshare_session
 from ..share.local import LocalShareProvider
-from ..auth import ApiAuth, OAuthAuth, all_auth
-from ..providers.catalog import build_provider_listing
-
+from ..share.share import fetch_shared_session, share_session, unshare_session
+from .opencode_view import build_message_v2
 
 _DEFAULT_MAX_REQUEST_BYTES = 2_000_000
+
+
+class _PromptQueues:
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._pending_permissions: dict[str, dict[str, Any]] = {}
+        self._permission_answers: dict[str, queue.Queue[str]] = {}
+        self._pending_questions: dict[str, dict[str, Any]] = {}
+        self._question_answers: dict[str, queue.Queue[list[str]]] = {}
+
+    def list_permissions(self) -> list[dict[str, Any]]:
+        with self._lock:
+            return list(self._pending_permissions.values())
+
+    def create_permission(self, request_id: str, rec: dict[str, Any]) -> queue.Queue[str]:
+        q: queue.Queue[str] = queue.Queue()
+        with self._lock:
+            self._pending_permissions[request_id] = dict(rec)
+            self._permission_answers[request_id] = q
+        return q
+
+    def remove_permission(self, request_id: str) -> None:
+        with self._lock:
+            self._pending_permissions.pop(request_id, None)
+            self._permission_answers.pop(request_id, None)
+
+    def submit_permission_reply(self, request_id: str, reply: str) -> bool:
+        with self._lock:
+            q = self._permission_answers.get(request_id)
+        if q is None:
+            return False
+        q.put_nowait(reply)
+        return True
+
+    def list_questions(self) -> list[dict[str, Any]]:
+        with self._lock:
+            return list(self._pending_questions.values())
+
+    def create_question(self, request_id: str, rec: dict[str, Any]) -> queue.Queue[list[str]]:
+        q: queue.Queue[list[str]] = queue.Queue()
+        with self._lock:
+            self._pending_questions[request_id] = dict(rec)
+            self._question_answers[request_id] = q
+        return q
+
+    def remove_question(self, request_id: str) -> None:
+        with self._lock:
+            self._pending_questions.pop(request_id, None)
+            self._question_answers.pop(request_id, None)
+
+    def submit_question_reply(self, request_id: str, answers: list[str]) -> bool:
+        with self._lock:
+            q = self._question_answers.get(request_id)
+        if q is None:
+            return False
+        q.put_nowait(list(answers))
+        return True
 
 
 def _parse_request_target(path: str) -> tuple[list[str], dict[str, str]]:
@@ -229,10 +284,7 @@ class OpenAgenticHttpServer:
         tui_lock = threading.Lock()
 
         # Permission / Question queues (OpenCode parity endpoints).
-        pending_permissions: dict[str, dict[str, Any]] = {}
-        permission_answers: dict[str, queue.Queue[str]] = {}
-        pending_questions: dict[str, dict[str, Any]] = {}
-        question_answers: dict[str, queue.Queue[list[str]]] = {}
+        prompt_queues = _PromptQueues()
 
         def _make_permission_gate_for_server():
             # Build a PermissionGate that routes approvals + AskUserQuestion answers
@@ -250,14 +302,11 @@ class OpenAgenticHttpServer:
                     "prompt": str(getattr(q, "prompt", "")),
                     "choices": list(getattr(q, "choices", []) or []),
                 }
-                pending_questions[qid] = rec
-                q_queue: queue.Queue[list[str]] = queue.Queue()
-                question_answers[qid] = q_queue
+                q_queue = prompt_queues.create_question(qid, rec)
                 try:
                     ans = q_queue.get(timeout=300.0)
                 finally:
-                    pending_questions.pop(qid, None)
-                    question_answers.pop(qid, None)
+                    prompt_queues.remove_question(qid)
                 return ans[0] if ans else ""
 
             async def _approver(tool_name: str, tool_input: Mapping[str, Any], context: Mapping[str, Any]) -> bool:
@@ -266,20 +315,18 @@ class OpenAgenticHttpServer:
                     return True
 
                 rid = str(context.get("tool_use_id") or "") or uuid.uuid4().hex
-                pending_permissions[rid] = {
+                rec = {
                     "id": rid,
                     "requestID": rid,
                     "tool": tool_name,
                     "input": dict(tool_input),
                     "message": None,
                 }
-                q_queue: queue.Queue[str] = queue.Queue()
-                permission_answers[rid] = q_queue
+                q_queue = prompt_queues.create_permission(rid, rec)
                 try:
                     reply = q_queue.get(timeout=300.0)
                 finally:
-                    pending_permissions.pop(rid, None)
-                    permission_answers.pop(rid, None)
+                    prompt_queues.remove_permission(rid)
                 return str(reply).strip().lower() in ("allow", "yes", "y")
 
             return PermissionGate(
@@ -636,11 +683,11 @@ class OpenAgenticHttpServer:
                         return
 
                 if parts == ["permission"]:
-                    _write_json(self, 200, list(pending_permissions.values()))
+                    _write_json(self, 200, prompt_queues.list_permissions())
                     return
 
                 if parts == ["question"]:
-                    _write_json(self, 200, list(pending_questions.values()))
+                    _write_json(self, 200, prompt_queues.list_questions())
                     return
 
                 if len(parts) == 2 and parts[0] == "share":
@@ -827,11 +874,9 @@ class OpenAgenticHttpServer:
                     if not isinstance(reply, str) or not reply:
                         _write_json(self, 400, {"error": "invalid_reply"})
                         return
-                    q = permission_answers.get(request_id)
-                    if q is None:
+                    if not prompt_queues.submit_permission_reply(request_id, reply):
                         _write_json(self, 404, {"error": "not_found"})
                         return
-                    q.put_nowait(reply)
                     _write_json(self, 200, True)
                     return
 
@@ -847,21 +892,17 @@ class OpenAgenticHttpServer:
                         answers_list = [str(x) for x in answers if isinstance(x, str) and x]
                     else:
                         answers_list = []
-                    q = question_answers.get(request_id)
-                    if q is None:
+                    if not prompt_queues.submit_question_reply(request_id, answers_list):
                         _write_json(self, 404, {"error": "not_found"})
                         return
-                    q.put_nowait(answers_list)
                     _write_json(self, 200, True)
                     return
 
                 if len(parts) == 3 and parts[0] == "question" and parts[2] == "reject":
                     request_id = parts[1]
-                    q = question_answers.get(request_id)
-                    if q is None:
+                    if not prompt_queues.submit_question_reply(request_id, []):
                         _write_json(self, 404, {"error": "not_found"})
                         return
-                    q.put_nowait([])
                     _write_json(self, 200, True)
                     return
                 if parts == ["session"]:

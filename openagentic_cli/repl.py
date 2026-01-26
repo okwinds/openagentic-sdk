@@ -9,6 +9,27 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TextIO
 
+from openagentic_sdk.options import OpenAgenticOptions
+from openagentic_sdk.paths import default_session_root
+from openagentic_sdk.runtime import AgentRuntime
+from openagentic_sdk.sessions.store import FileSessionStore
+from openagentic_sdk.skills.index import index_skills
+
+from .permissions import CliPermissionPolicy, build_permission_gate
+from .style import (
+    ANSI_BG_GRAY,
+    ANSI_FG_DEFAULT,
+    ANSI_FG_GREEN,
+    ANSI_RESET,
+    InlineCodeHighlighter,
+    StyleConfig,
+    StylizingStream,
+    bold,
+    dim,
+    fg_red,
+    should_colorize,
+)
+from .trace import TraceRenderer
 
 _BP_ENABLE = "\x1b[?2004h"
 _BP_DISABLE = "\x1b[?2004l"
@@ -71,28 +92,6 @@ def read_repl_turn(stdin: TextIO, *, paste_mode: bool = False) -> ReplTurn | Non
 
     text = "".join(parts).rstrip("\r\n")
     return ReplTurn(text, is_paste=is_paste)
-
-from openagentic_sdk.options import OpenAgenticOptions
-from openagentic_sdk.paths import default_session_root
-from openagentic_sdk.runtime import AgentRuntime
-from openagentic_sdk.sessions.store import FileSessionStore
-from openagentic_sdk.skills.index import index_skills
-
-from .permissions import CliPermissionPolicy, build_permission_gate
-from .style import (
-    ANSI_BG_GRAY,
-    ANSI_FG_DEFAULT,
-    ANSI_FG_GREEN,
-    ANSI_RESET,
-    InlineCodeHighlighter,
-    StyleConfig,
-    StylizingStream,
-    bold,
-    dim,
-    fg_red,
-    should_colorize,
-)
-from .trace import TraceRenderer
 
 
 def parse_repl_command(line: str) -> tuple[str, str] | None:

@@ -133,3 +133,12 @@ Update user docs to mention:
 
 - Multi-line paste is coalesced into a single prompt when supported by the terminal.
 - Manual mode: `/paste` to start, `/end` to finish.
+
+---
+
+## Results (DONE)
+
+- Implementation: `openagentic_cli/repl.py`
+- Tests: `tests/test_cli_repl_multiline_paste.py`
+- Guide: `docs/guides/oa-chat-multiline-paste.md`
+- Verification: `python -m unittest -q tests.test_cli_repl_multiline_paste`

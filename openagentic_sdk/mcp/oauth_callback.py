@@ -24,6 +24,7 @@ class OAuthCallbackServer:
     _thread: threading.Thread | None = None
     _loop: asyncio.AbstractEventLoop | None = None
     _pending: dict[str, asyncio.Future[str]] = field(default_factory=dict)
+    _pending_lock: threading.Lock = field(default_factory=threading.Lock)
 
     @property
     def redirect_uri(self) -> str:
@@ -50,44 +51,11 @@ class OAuthCallbackServer:
                 return
 
             def do_GET(self) -> None:  # noqa: N802
-                u = urlparse(self.path)
-                if u.path != parent.path:
-                    self.send_response(404)
-                    self.end_headers()
-                    return
-
-                qs = parse_qs(u.query)
-                state = (qs.get("state") or [""])[0]
-                code = (qs.get("code") or [""])[0]
-                err = (qs.get("error") or [""])[0]
-                err_desc = (qs.get("error_description") or [""])[0]
-
-                if not state:
-                    self.send_response(400)
-                    self.end_headers()
-                    self.wfile.write(b"Missing required state parameter")
-                    return
-
-                fut = parent._pending.get(state)
-                if fut is None:
-                    self.send_response(400)
-                    self.end_headers()
-                    self.wfile.write(b"Invalid or expired state parameter")
-                    return
-
-                # Resolve promise (thread-safe via loop).
-                parent._pending.pop(state, None)
-                loop = parent._loop
-                if loop is not None and not fut.done():
-                    if err:
-                        msg = err_desc or err
-                        loop.call_soon_threadsafe(fut.set_exception, RuntimeError(msg))
-                    else:
-                        loop.call_soon_threadsafe(fut.set_result, code)
-
-                self.send_response(200)
+                code, body = parent._handle_callback_path(self.path)
+                self.send_response(code)
                 self.end_headers()
-                self.wfile.write(b"OAuth complete. You may close this window.")
+                if body:
+                    self.wfile.write(body)
 
         srv = ThreadingHTTPServer((self.host, self.port), Handler)
         srv.daemon_threads = True
@@ -104,6 +72,48 @@ class OAuthCallbackServer:
         t = threading.Thread(target=_run, name="oa-mcp-oauth-callback", daemon=True)
         self._thread = t
         t.start()
+
+    def _handle_callback_path(self, raw_path: str) -> tuple[int, bytes]:
+        """Handle an inbound callback request path.
+
+        Returns (status_code, response_body). This is split out for unit tests so we can
+        validate locking and callback resolution without binding a real socket.
+        """
+
+        u = urlparse(raw_path)
+        if u.path != self.path:
+            return 404, b""
+
+        qs = parse_qs(u.query)
+        state = (qs.get("state") or [""])[0]
+        code = (qs.get("code") or [""])[0]
+        err = (qs.get("error") or [""])[0]
+        err_desc = (qs.get("error_description") or [""])[0]
+
+        if not state:
+            return 400, b"Missing required state parameter"
+
+        with self._pending_lock:
+            fut = self._pending.pop(state, None)
+        if fut is None:
+            return 400, b"Invalid or expired state parameter"
+
+        # Resolve promise (thread-safe via loop).
+        loop = self._loop
+        if not fut.done():
+            if err:
+                msg = err_desc or err
+                if loop is not None:
+                    loop.call_soon_threadsafe(fut.set_exception, RuntimeError(msg))
+                else:
+                    fut.set_exception(RuntimeError(msg))
+            else:
+                if loop is not None:
+                    loop.call_soon_threadsafe(fut.set_result, code)
+                else:
+                    fut.set_result(code)
+
+        return 200, b"OAuth complete. You may close this window."
 
     async def close(self) -> None:
         srv = self._srv
@@ -124,10 +134,12 @@ class OAuthCallbackServer:
             await asyncio.to_thread(t.join, 1.0)
 
         # Fail any pending waiters.
-        for state, fut in list(self._pending.items()):
+        with self._pending_lock:
+            pending = list(self._pending.items())
+            self._pending.clear()
+        for _state, fut in pending:
             if not fut.done():
                 fut.set_exception(RuntimeError("oauth callback server closed"))
-        self._pending.clear()
 
     async def wait_for_callback(self, state: str, *, timeout_s: float = 300.0) -> str:
         if not state:
@@ -136,14 +148,16 @@ class OAuthCallbackServer:
 
         loop = asyncio.get_running_loop()
         fut: asyncio.Future[str] = loop.create_future()
-        if state in self._pending:
-            raise RuntimeError("callback already pending for state")
-        self._pending[state] = fut
+        with self._pending_lock:
+            if state in self._pending:
+                raise RuntimeError("callback already pending for state")
+            self._pending[state] = fut
 
         def _timeout() -> None:
             if fut.done():
                 return
-            self._pending.pop(state, None)
+            with self._pending_lock:
+                self._pending.pop(state, None)
             fut.set_exception(TimeoutError("oauth callback timeout"))
 
         h = loop.call_later(float(timeout_s), _timeout)
